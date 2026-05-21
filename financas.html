@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finanças">
+<title>Finanças do Casal</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f5f3;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#aaa;--border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);--r:12px;--rm:8px}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--text:#f2f2f7;--text2:#aeaeb2;--text3:#636366;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18)}}
+body{background:var(--bg3);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;min-height:100vh;padding-bottom:2rem}
+header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:1rem 1.1rem .8rem;position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:17px;font-weight:600}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3)}
+.dot{width:7px;height:7px;border-radius:50%;background:#aaa;flex-shrink:0}
+.dot.ok{background:#1d9e75}.dot.err{background:#e24b4a}.dot.loading{background:#ba7517}
+.wrap{padding:.8rem .9rem;display:flex;flex-direction:column;gap:.8rem}
+.card{background:var(--bg);border-radius:var(--r);border:0.5px solid var(--border);padding:1rem}
+.lbl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.7rem}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--text2)}
+.field input,.field select{background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--rm);color:var(--text);font-size:15px;padding:10px 12px;width:100%;outline:none;-webkit-appearance:none;appearance:none}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.btn-add{width:100%;margin-top:.7rem;padding:12px;background:#1d9e75;color:#fff;border:none;border-radius:var(--rm);font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-add:active{opacity:.85}
+.btn-add:disabled{opacity:.5;cursor:not-allowed}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.metric{background:var(--bg);border-radius:var(--r);border:0.5px solid var(--border);padding:.85rem 1rem}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:3px}
+.metric-value{font-size:21px;font-weight:600;letter-spacing:-.4px}
+.filter-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.6rem}
+.filter-row input{background:var(--bg2);border:0.5px solid var(--border2);border-radius:var(--rm);color:var(--text);font-size:14px;padding:9px 11px;width:100%;outline:none;-webkit-appearance:none}
+.qbtns{display:flex;gap:.4rem;margin-bottom:.5rem}
+.qbtn{flex:1;padding:7px 4px;font-size:12px;font-weight:500;border-radius:var(--rm);cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text2)}
+.finfo{font-size:12px;color:var(--text2);text-align:center;padding:3px 0}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.bar-row:last-child{margin-bottom:0}
+.bar-name{font-size:12px;color:var(--text2);width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.bar-track{flex:1;height:7px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .3s ease}
+.bar-val{font-size:12px;font-weight:600;white-space:nowrap;min-width:72px;text-align:right}
+.empty{text-align:center;padding:1.5rem;color:var(--text3);font-size:13px}
+.item{display:flex;align-items:flex-start;gap:9px;padding:.75rem 0;border-bottom:0.5px solid var(--border)}
+.item:last-child{border-bottom:none;padding-bottom:0}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+.item-main{flex:1;min-width:0}
+.item-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-meta{font-size:11px;color:var(--text2);margin-top:2px;display:flex;gap:5px;align-items:center}
+.pill{font-size:10px;font-weight:500;padding:2px 7px;border-radius:20px;background:var(--bg2);color:var(--text2)}
+.item-right{text-align:right;flex-shrink:0}
+.item-amount{font-size:14px;font-weight:600}
+.item-date{font-size:11px;color:var(--text3);margin-top:1px}
+.del-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;line-height:1;margin-top:1px}
+.del-btn:active{color:#c0392b}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💳 Finanças do Casal</h1>
+  <div class="sync-badge">
+    <div class="dot loading" id="dot"></div>
+    <span id="sync-txt">conectando...</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="lbl">Nova compra</div>
+    <div class="g2">
+      <div class="field"><label>Data</label><input type="date" id="inp-date"></div>
+      <div class="field"><label>Valor (R$)</label><input type="number" id="inp-amount" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
+    </div>
+    <div class="field" style="margin-top:.6rem"><label>Nome da compra</label><input type="text" id="inp-name" placeholder="Ex: Supermercado, Netflix..."></div>
+    <div class="g2" style="margin-top:.6rem">
+      <div class="field">
+        <label>Quem comprou</label>
+        <select id="inp-person">
+          <option value="">Selecione...</option>
+          <option>LE</option><option>PAIS LE</option><option>NÓS</option><option>PAIS IGOR</option><option>IGOR</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Banco</label>
+        <select id="inp-bank">
+          <option value="">Selecione...</option>
+          <option>C6</option><option>MERCADO PAGO</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn-add" id="btn-add" onclick="addEntry()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Adicionar compra
+    </button>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Total geral</div><div class="metric-value" id="total-geral">—</div></div>
+    <div class="metric"><div class="metric-label">Compras</div><div class="metric-value" id="total-count">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Filtrar por período</div>
+    <div class="filter-row">
+      <div><div style="font-size:11px;color:var(--text2);margin-bottom:3px">De</div><input type="date" id="filter-from" onchange="render()"></div>
+      <div><div style="font-size:11px;color:var(--text2);margin-bottom:3px">Até</div><input type="date" id="filter-to" onchange="render()"></div>
+    </div>
+    <div class="qbtns">
+      <button class="qbtn" onclick="setQuick('mes')">Este mês</button>
+      <button class="qbtn" onclick="setQuick('7')">7 dias</button>
+      <button class="qbtn" onclick="setQuick('30')">30 dias</button>
+      <button class="qbtn" style="color:var(--text3)" onclick="clearFilter()">Tudo</button>
+    </div>
+    <div class="finfo" id="finfo"></div>
+  </div>
+
+  <div class="card"><div class="lbl">Por banco</div><div id="bank-bars"><p class="empty">Nenhuma compra ainda</p></div></div>
+  <div class="card"><div class="lbl">Por pessoa</div><div id="person-bars"><p class="empty">Nenhuma compra ainda</p></div></div>
+  <div class="card"><div class="lbl">Histórico</div><div id="history"><p class="empty">Nenhuma compra registrada</p></div></div>
+
+</div>
+
+<script>
+const firebaseConfig={
+  databaseURL:"https://financas-casal-494ee-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const ref=db.ref('compras');
+
+const PC={'LE':['#dbeafe','#1d4ed8'],'PAIS LE':['#d1fae5','#065f46'],'NÓS':['#ede9fe','#5b21b6'],'PAIS IGOR':['#fef3c7','#92400e'],'IGOR':['#fee2e2','#991b1b']};
+const BANK_C=['#3266ad','#1d9e75'];
+const BANKS=['C6','MERCADO PAGO'];
+let entries=[];
+
+const PRELOADED=[
+  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90},
+  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99},
+  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00},
+  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00},
+  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4 PARCELA",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00},
+  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80},
+  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99},
+  {id:'pre8',date:"2026-05-16",name:"CADEIRA MASSAGEM",person:"IGOR",bank:"MERCADO PAGO",amount:10.00},
+  {id:'pre9',date:"2026-05-19",name:"ENERGETICO ANTIACIDENTE",person:"IGOR",bank:"MERCADO PAGO",amount:15.50},
+  {id:'pre10',date:"2026-05-19",name:"SALGADO ANTIACIDENTE",person:"IGOR",bank:"MERCADO PAGO",amount:7.00},
+  {id:'pre11',date:"2026-05-19",name:"ML ABASTECIMENTO POLO",person:"IGOR",bank:"MERCADO PAGO",amount:204.32},
+  {id:'pre12',date:"2025-12-02",name:"AFPESP AVARE 7/10",person:"NÓS",bank:"MERCADO PAGO",amount:92.00},
+  {id:'pre13',date:"2026-04-18",name:"AFPESP IBIRA 2/10",person:"NÓS",bank:"MERCADO PAGO",amount:91.50},
+  {id:'pre14',date:"2026-04-20",name:"RIPADO 2/4",person:"NÓS",bank:"MERCADO PAGO",amount:46.40},
+  {id:'pre15',date:"2026-04-23",name:"ASPIRADOR 2/21",person:"NÓS",bank:"MERCADO PAGO",amount:82.63},
+  {id:'pre16',date:"2026-05-16",name:"TORNEIRA COZINHA",person:"NÓS",bank:"MERCADO PAGO",amount:86.99},
+  {id:'pre17',date:"2026-05-16",name:"DISPENSER DETERGENTE EMBUTIR",person:"NÓS",bank:"MERCADO PAGO",amount:22.89},
+  {id:'pre18',date:"2026-05-16",name:"SUPORTE BUCHA",person:"NÓS",bank:"MERCADO PAGO",amount:11.64},
+  {id:'pre19',date:"2026-05-16",name:"KIT BROCA DIAMANTADA MARMORE",person:"NÓS",bank:"MERCADO PAGO",amount:29.99},
+  {id:'pre20',date:"2026-05-16",name:"SUPORTE OVO MARAVILHAS",person:"NÓS",bank:"MERCADO PAGO",amount:26.97},
+  {id:'pre21',date:"2026-05-16",name:"ARANDELA DE BATERIA AMOR",person:"NÓS",bank:"MERCADO PAGO",amount:35.00},
+  {id:'pre22',date:"2026-05-17",name:"BATERIA PARAFUSADEIRA",person:"NÓS",bank:"MERCADO PAGO",amount:38.99},
+  {id:'pre23',date:"2026-05-18",name:"RADIADOR POLO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:702.00},
+  {id:'pre24',date:"2025-06-15",name:"PC",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:32.07},
+  {id:'pre25',date:"2025-06-15",name:"TELA",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:98.57},
+  {id:'pre26',date:"2026-04-19",name:"MAQUINA DE GELO 2/4",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:86.58},
+  {id:'pre27',date:"2026-05-17",name:"CODATTO - GUARDADO NO COFRINHO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:100.45},
+  {id:'pre28',date:"2026-05-18",name:"TRAVESSEIRO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:45.99}
+];
+
+function setSync(state,txt){
+  document.getElementById('dot').className='dot '+state;
+  document.getElementById('sync-txt').textContent=txt;
+}
+
+function fmt(v){return'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtDate(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
+function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+
+function getFiltered(){
+  const from=document.getElementById('filter-from').value;
+  const to=document.getElementById('filter-to').value;
+  return entries.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to));
+}
+
+function setQuick(type){
+  const today=new Date();
+  const toStr=today.toISOString().split('T')[0];
+  let fromStr;
+  if(type==='mes'){fromStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;}
+  else{const d=new Date(today);d.setDate(d.getDate()-parseInt(type));fromStr=d.toISOString().split('T')[0];}
+  document.getElementById('filter-from').value=fromStr;
+  document.getElementById('filter-to').value=toStr;
+  render();
+}
+
+function clearFilter(){
+  document.getElementById('filter-from').value='';
+  document.getElementById('filter-to').value='';
+  render();
+}
+
+function sumBy(list,key){
+  const map={};
+  list.forEach(e=>{map[e[key]]=(map[e[key]]||0)+e.amount});
+  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+}
+
+function renderBars(id,data,type){
+  const el=document.getElementById(id);
+  if(!data.length){el.innerHTML='<p class="empty">Nenhuma compra neste período</p>';return;}
+  const max=data[0][1];
+  el.innerHTML=data.map(([name,val],i)=>{
+    const c=type==='person'?(PC[name]||['#e5e5e5','#555'])[1]:BANK_C[BANKS.indexOf(name)]??BANK_C[i]??'#888';
+    return`<div class="bar-row">
+      <span class="bar-name" title="${name}">${name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(val/max*100).toFixed(1)}%;background:${c}"></div></div>
+      <span class="bar-val">${fmt(val)}</span>
+    </div>`;
+  }).join('');
+}
+
+function render(){
+  const filtered=getFiltered();
+  const from=document.getElementById('filter-from').value;
+  const to=document.getElementById('filter-to').value;
+  const total=entries.reduce((s,e)=>s+e.amount,0);
+  document.getElementById('total-geral').textContent=fmt(total);
+  document.getElementById('total-count').textContent=entries.length;
+  const fi=document.getElementById('finfo');
+  if(from||to){
+    const ft=filtered.reduce((s,e)=>s+e.amount,0);
+    const parts=[];if(from)parts.push(`de ${fmtDate(from)}`);if(to)parts.push(`até ${fmtDate(to)}`);
+    fi.textContent=`${filtered.length} compra${filtered.length!==1?'s':''} ${parts.join(' ')} · ${fmt(ft)}`;
+  } else {fi.textContent='Mostrando todas as compras';}
+  renderBars('bank-bars',sumBy(filtered,'bank'),'bank');
+  renderBars('person-bars',sumBy(filtered,'person'),'person');
+  const hist=document.getElementById('history');
+  if(!entries.length){hist.innerHTML='<p class="empty">Nenhuma compra registrada</p>';return;}
+  const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1));
+  hist.innerHTML=sorted.map(e=>{
+    const[bg,fg]=PC[e.person]||['#e5e5e5','#555'];
+    return`<div class="item">
+      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
+      <div class="item-main">
+        <div class="item-name">${e.name}</div>
+        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
+      </div>
+      <div class="item-right">
+        <div class="item-amount">${fmt(e.amount)}</div>
+        <div class="item-date">${fmtDate(e.date)}</div>
+      </div>
+      <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function addEntry(){
+  const date=document.getElementById('inp-date').value;
+  const name=document.getElementById('inp-name').value.trim();
+  const person=document.getElementById('inp-person').value;
+  const bank=document.getElementById('inp-bank').value;
+  const amount=parseFloat(document.getElementById('inp-amount').value);
+  if(!date||!name||!person||!bank||isNaN(amount)||amount<=0){alert('Preencha todos os campos com valores válidos.');return;}
+  const btn=document.getElementById('btn-add');
+  btn.disabled=true;
+  const newRef=ref.push();
+  newRef.set({id:newRef.key,date,name,person,bank,amount},err=>{
+    btn.disabled=false;
+    if(!err){
+      document.getElementById('inp-name').value='';
+      document.getElementById('inp-person').value='';
+      document.getElementById('inp-bank').value='';
+      document.getElementById('inp-amount').value='';
+    } else {alert('Erro ao salvar. Verifique sua conexão.');}
+  });
+}
+
+function removeEntry(id){
+  if(!confirm('Remover esta compra?'))return;
+  ref.child(id).remove();
+}
+
+ref.once('value',snap=>{
+  if(!snap.exists()){
+    const batch={};
+    PRELOADED.forEach(e=>{batch[e.id]=e;});
+    ref.set(batch);
+  }
+});
+
+ref.on('value',snap=>{
+  entries=[];
+  if(snap.exists()){
+    snap.forEach(child=>{entries.push(child.val());});
+  }
+  setSync('ok','sincronizado ✓');
+  render();
+},err=>{
+  setSync('err','erro de conexão');
+});
+
+document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+</script>
+</body>
+</html>
