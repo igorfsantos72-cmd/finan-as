@@ -57,6 +57,9 @@ header h1{font-size:17px;font-weight:600}
 .item-date{font-size:11px;color:var(--text3);margin-top:1px}
 .del-btn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;line-height:1;margin-top:1px}
 .del-btn:active{color:#c0392b}
+.person-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem}
+.pchip{padding:6px 12px;font-size:12px;font-weight:500;border-radius:20px;cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text2);white-space:nowrap}
+.pchip.active{background:#1d9e75;color:#fff;border-color:#1d9e75}
 </style>
 </head>
 <body>
@@ -100,9 +103,8 @@ header h1{font-size:17px;font-weight:600}
     </button>
   </div>
 
-  <div class="metrics">
-    <div class="metric"><div class="metric-label">Total geral</div><div class="metric-value" id="total-geral">—</div></div>
-    <div class="metric"><div class="metric-label">Compras</div><div class="metric-value" id="total-count">—</div></div>
+  <div class="metric" style="background:var(--bg);border-radius:var(--r);border:0.5px solid var(--border);padding:.85rem 1rem">
+    <div class="metric-label">Total geral</div><div class="metric-value" id="total-geral">—</div>
   </div>
 
   <div class="card">
@@ -116,6 +118,15 @@ header h1{font-size:17px;font-weight:600}
       <button class="qbtn" onclick="setQuick('7')">7 dias</button>
       <button class="qbtn" onclick="setQuick('30')">30 dias</button>
       <button class="qbtn" style="color:var(--text3)" onclick="clearFilter()">Tudo</button>
+    </div>
+    <div class="lbl" style="margin-top:.8rem;margin-bottom:.5rem">Filtrar por pessoa</div>
+    <div class="person-chips" id="person-chips">
+      <button class="pchip active" onclick="setPerson('')">Todos</button>
+      <button class="pchip" onclick="setPerson('LE')">LE</button>
+      <button class="pchip" onclick="setPerson('PAIS LE')">PAIS LE</button>
+      <button class="pchip" onclick="setPerson('NÓS')">NÓS</button>
+      <button class="pchip" onclick="setPerson('PAIS IGOR')">PAIS IGOR</button>
+      <button class="pchip" onclick="setPerson('IGOR')">IGOR</button>
     </div>
     <div class="finfo" id="finfo"></div>
   </div>
@@ -179,10 +190,22 @@ function fmt(v){return'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,ma
 function fmtDate(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
 function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
 
+let activePerson='';
+function setPerson(p){
+  activePerson=p;
+  document.querySelectorAll('.pchip').forEach(btn=>{
+    btn.classList.toggle('active', btn.textContent.trim()===(p||'Todos'));
+  });
+  render();
+}
 function getFiltered(){
   const from=document.getElementById('filter-from').value;
   const to=document.getElementById('filter-to').value;
-  return entries.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to));
+  return entries.filter(e=>
+    (!from||e.date>=from)&&
+    (!to||e.date<=to)&&
+    (!activePerson||e.person===activePerson)
+  );
 }
 
 function setQuick(type){
@@ -199,7 +222,7 @@ function setQuick(type){
 function clearFilter(){
   document.getElementById('filter-from').value='';
   document.getElementById('filter-to').value='';
-  render();
+  setPerson('');
 }
 
 function sumBy(list,key){
@@ -228,13 +251,15 @@ function render(){
   const to=document.getElementById('filter-to').value;
   const total=entries.reduce((s,e)=>s+e.amount,0);
   document.getElementById('total-geral').textContent=fmt(total);
-  document.getElementById('total-count').textContent=entries.length;
   const fi=document.getElementById('finfo');
-  if(from||to){
-    const ft=filtered.reduce((s,e)=>s+e.amount,0);
-    const parts=[];if(from)parts.push(`de ${fmtDate(from)}`);if(to)parts.push(`até ${fmtDate(to)}`);
-    fi.textContent=`${filtered.length} compra${filtered.length!==1?'s':''} ${parts.join(' ')} · ${fmt(ft)}`;
-  } else {fi.textContent='Mostrando todas as compras';}
+  const ft=filtered.reduce((s,e)=>s+e.amount,0);
+  const parts=[];
+  if(from)parts.push(`de ${fmtDate(from)}`);
+  if(to)parts.push(`até ${fmtDate(to)}`);
+  if(activePerson)parts.push(`· ${activePerson}`);
+  if(parts.length){
+    fi.textContent=`${filtered.length} compra${filtered.length!==1?'s':''} ${parts.join(' ')} — ${fmt(ft)}`;
+  } else {fi.textContent=`${filtered.length} compra${filtered.length!==1?'s':''} · ${fmt(ft)}`;}
   renderBars('bank-bars',sumBy(filtered,'bank'),'bank');
   renderBars('person-bars',sumBy(filtered,'person'),'person');
   const hist=document.getElementById('history');
