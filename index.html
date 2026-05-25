@@ -60,6 +60,12 @@ header h1{font-size:17px;font-weight:600}
 .person-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem}
 .pchip{padding:6px 12px;font-size:12px;font-weight:500;border-radius:20px;cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text2);white-space:nowrap}
 .pchip.active{background:#1d9e75;color:#fff;border-color:#1d9e75}
+.hist-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.hist-toggle{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);background:none;border:0.5px solid var(--border2);border-radius:20px;padding:4px 10px;cursor:pointer}
+.hist-toggle svg{transition:transform .25s ease}
+.hist-toggle.open svg{transform:rotate(180deg)}
+#history-wrap{overflow:hidden;transition:max-height .3s ease;max-height:0}
+#history-wrap.open{max-height:99999px}
 .bank-section{margin-bottom:1rem}
 .bank-section:last-child{margin-bottom:0}
 .bank-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:0.5px solid var(--border)}
@@ -110,7 +116,19 @@ header h1{font-size:17px;font-weight:600}
     </button>
   </div>
 
-  <div class="card" id="card-history"><div class="lbl" id="hist-label">Histórico</div><div id="history"><p class="empty">Nenhuma compra registrada</p></div></div>
+  <div class="card" id="card-history">
+    <div class="hist-header" onclick="toggleHistory()">
+      <div class="lbl" id="hist-label" style="margin-bottom:0">Histórico</div>
+      <button class="hist-toggle" id="hist-toggle-btn">
+        <span id="hist-toggle-txt">Ver tudo</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+    <div id="history-wrap">
+      <div style="height:.7rem"></div>
+      <div id="history"><p class="empty">Nenhuma compra registrada</p></div>
+    </div>
+  </div>
 
   <div class="card">
     <div class="lbl">Filtrar por período</div>
@@ -253,6 +271,17 @@ function renderBars(id,data,type){
       <span class="bar-val">${fmt(val)}</span>
     </div>`;
   }).join('');
+}
+
+let histOpen=false;
+function toggleHistory(){
+  histOpen=!histOpen;
+  const wrap=document.getElementById('history-wrap');
+  const btn=document.getElementById('hist-toggle-btn');
+  const txt=document.getElementById('hist-toggle-txt');
+  wrap.classList.toggle('open',histOpen);
+  btn.classList.toggle('open',histOpen);
+  txt.textContent=histOpen?'Minimizar':'Ver tudo';
 }
 
 function renderItem(e){
