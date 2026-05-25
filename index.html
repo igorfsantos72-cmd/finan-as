@@ -93,7 +93,7 @@ header h1{font-size:17px;font-weight:600}
         <label>Quem comprou</label>
         <select id="inp-person">
           <option value="">Selecione...</option>
-          <option>LE</option><option>PAIS LE</option><option>NÓS</option><option>PAIS IGOR</option><option>IGOR</option>
+          <option>LE</option><option>PAIS LE</option><option>NÓS</option><option>PAIS IGOR</option><option>IGOR</option><option>COMBUSTIVEL POLO</option><option>CARONAS</option>
         </select>
       </div>
       <div class="field">
@@ -110,9 +110,7 @@ header h1{font-size:17px;font-weight:600}
     </button>
   </div>
 
-  <div class="metric" style="background:var(--bg);border-radius:var(--r);border:0.5px solid var(--border);padding:.85rem 1rem">
-    <div class="metric-label">Total geral</div><div class="metric-value" id="total-geral">—</div>
-  </div>
+  <div class="card" id="card-history"><div class="lbl" id="hist-label">Histórico</div><div id="history"><p class="empty">Nenhuma compra registrada</p></div></div>
 
   <div class="card">
     <div class="lbl">Filtrar por período</div>
@@ -134,6 +132,8 @@ header h1{font-size:17px;font-weight:600}
       <button class="pchip" onclick="setPerson('NÓS')">NÓS</button>
       <button class="pchip" onclick="setPerson('PAIS IGOR')">PAIS IGOR</button>
       <button class="pchip" onclick="setPerson('IGOR')">IGOR</button>
+      <button class="pchip" onclick="setPerson('COMBUSTIVEL POLO')">COMBUSTIVEL POLO</button>
+      <button class="pchip" onclick="setPerson('CARONAS')">CARONAS</button>
     </div>
     <div class="finfo" id="finfo"></div>
   </div>
@@ -141,7 +141,9 @@ header h1{font-size:17px;font-weight:600}
   <div class="card" id="card-bank"><div class="lbl">Por banco</div><div id="bank-bars"><p class="empty">Nenhuma compra ainda</p></div></div>
   <div class="card" id="card-person"><div class="lbl">Por pessoa</div><div id="person-bars"><p class="empty">Nenhuma compra ainda</p></div></div>
   <div class="card" id="card-bank-person" style="display:none"><div class="lbl" id="bank-person-label">Gastos por banco</div><div id="bank-person-bars"></div></div>
-  <div class="card" id="card-history"><div class="lbl" id="hist-label">Histórico</div><div id="history"><p class="empty">Nenhuma compra registrada</p></div></div>
+  <div class="metric" style="background:var(--bg);border-radius:var(--r);border:0.5px solid var(--border);padding:.85rem 1rem">
+    <div class="metric-label">Total geral</div><div class="metric-value" id="total-geral">—</div>
+  </div>
 
 </div>
 
@@ -153,7 +155,7 @@ firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 const ref=db.ref('compras');
 
-const PC={'LE':['#dbeafe','#1d4ed8'],'PAIS LE':['#d1fae5','#065f46'],'NÓS':['#ede9fe','#5b21b6'],'PAIS IGOR':['#fef3c7','#92400e'],'IGOR':['#fee2e2','#991b1b']};
+const PC={'LE':['#dbeafe','#1d4ed8'],'PAIS LE':['#d1fae5','#065f46'],'NÓS':['#ede9fe','#5b21b6'],'PAIS IGOR':['#fef3c7','#92400e'],'IGOR':['#fee2e2','#991b1b'],'COMBUSTIVEL POLO':['#fde8d8','#b94a08'],'CARONAS':['#e0f2fe','#0369a1']};
 const BANK_C=['#3266ad','#1d9e75'];
 const BANKS=['C6','MERCADO PAGO'];
 let entries=[];
