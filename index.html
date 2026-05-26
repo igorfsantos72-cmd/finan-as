@@ -38,6 +38,13 @@ header h1{font-size:17px;font-weight:600}
 .qbtns{display:flex;gap:.4rem;margin-bottom:.5rem}
 .qbtn{flex:1;padding:7px 4px;font-size:12px;font-weight:500;border-radius:var(--rm);cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text2)}
 .finfo{font-size:12px;color:var(--text2);text-align:center;padding:3px 0}
+.invoice-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem}
+.inv-chip{padding:6px 11px;font-size:12px;font-weight:500;border-radius:20px;cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text2);white-space:nowrap;text-align:left}
+.inv-chip.active{background:#3266ad;color:#fff;border-color:#3266ad}
+.inv-chip.mp.active{background:#1d9e75;color:#fff;border-color:#1d9e75}
+.inv-bank-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem;margin-top:.6rem}
+.inv-bank-label:first-child{margin-top:0}
+.inv-due{font-size:10px;opacity:.8;display:block;font-weight:400}
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .bar-row:last-child{margin-bottom:0}
 .bar-name{font-size:12px;color:var(--text2);width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
@@ -153,6 +160,11 @@ header h1{font-size:17px;font-weight:600}
       <button class="pchip" onclick="setPerson('COMBUSTIVEL POLO')">COMBUSTIVEL POLO</button>
       <button class="pchip" onclick="setPerson('CARONAS')">CARONAS</button>
     </div>
+    <div class="lbl" style="margin-top:.8rem;margin-bottom:.5rem">Filtrar por fatura</div>
+    <div class="inv-bank-label">C6 — Fecha dia 22 · Vence dia 01</div>
+    <div class="invoice-chips" id="chips-c6"></div>
+    <div class="inv-bank-label">Mercado Pago — Fecha dia 15 · Vence dia 20</div>
+    <div class="invoice-chips" id="chips-mp"></div>
     <div class="finfo" id="finfo"></div>
   </div>
 
@@ -218,6 +230,96 @@ function fmt(v){return'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,ma
 function fmtDate(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
 function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
 
+// Invoice cycle config
+const INVOICE_CONFIG={
+  'C6':   {closeDay:22, dueDay:1,  dueSameMonth:false},
+  'MERCADO PAGO': {closeDay:15, dueDay:20, dueSameMonth:true}
+};
+
+// Get cycle start/end for a given bank and reference date (year, month = invoice closing month)
+function getInvoiceCycle(bank, year, month){
+  const cfg=INVOICE_CONFIG[bank];
+  if(!cfg) return null;
+  // cycle: from (closeDay+1) of previous month to closeDay of current month
+  const start=new Date(year, month-1, cfg.closeDay+1); // day after close of prev period
+  // Go back one month for start
+  const closeDate=new Date(year, month-1, cfg.closeDay);
+  const startDate=new Date(closeDate);
+  startDate.setMonth(startDate.getMonth()-1);
+  startDate.setDate(cfg.closeDay+1);
+  // due date
+  let dueDate;
+  if(cfg.dueSameMonth){
+    dueDate=new Date(year, month-1, cfg.dueDay);
+  } else {
+    dueDate=new Date(year, month, cfg.dueDay);
+  }
+  return {
+    startStr: startDate.toISOString().split('T')[0],
+    endStr:   closeDate.toISOString().split('T')[0],
+    dueStr:   dueDate.toISOString().split('T')[0],
+    label:    closeDate.toLocaleString('pt-BR',{month:'short',year:'numeric'}).replace(' de ','/')
+  };
+}
+
+// Build last 6 invoice chips for each bank
+function buildInvoiceChips(){
+  const today=new Date();
+  ['C6','MERCADO PAGO'].forEach(bank=>{
+    const containerId=bank==='C6'?'chips-c6':'chips-mp';
+    const el=document.getElementById(containerId);
+    if(!el) return;
+    const cfg=INVOICE_CONFIG[bank];
+    const chips=[];
+    // Generate last 6 + next 1 cycles
+    for(let i=-1;i<=5;i++){
+      const ref=new Date(today.getFullYear(), today.getMonth()-i+1, 1);
+      const cycle=getInvoiceCycle(bank, ref.getFullYear(), ref.getMonth()+1);
+      if(!cycle) continue;
+      // Check if this cycle has any entries
+      chips.push({...cycle, bank});
+    }
+    // Remove duplicates by startStr
+    const seen=new Set();
+    const unique=chips.filter(c=>{
+      if(seen.has(c.startStr)) return false;
+      seen.add(c.startStr);
+      return true;
+    });
+    el.innerHTML=unique.slice(0,7).map(c=>{
+      const cls=bank==='MERCADO PAGO'?'inv-chip mp':'inv-chip';
+      const monthName=new Date(c.endStr+'T12:00:00').toLocaleString('pt-BR',{month:'long',year:'numeric'});
+      return`<button class="${cls}" onclick="setInvoice('${bank}','${c.startStr}','${c.endStr}')" data-start="${c.startStr}" data-end="${c.endStr}" data-bank="${bank}">
+        ${monthName.charAt(0).toUpperCase()+monthName.slice(1)}
+        <span class="inv-due">Vence ${c.dueStr.split('-').reverse().join('/')}</span>
+      </button>`;
+    }).join('');
+  });
+}
+
+let activeInvoice=null; // {bank, start, end}
+
+function setInvoice(bank, start, end){
+  // Toggle off if already active
+  if(activeInvoice && activeInvoice.bank===bank && activeInvoice.start===start){
+    activeInvoice=null;
+    document.querySelectorAll('.inv-chip').forEach(b=>b.classList.remove('active'));
+    render();
+    return;
+  }
+  activeInvoice={bank, start, end};
+  // Update chip active state
+  document.querySelectorAll('.inv-chip').forEach(b=>{
+    b.classList.toggle('active', b.dataset.start===start && b.dataset.bank===bank);
+  });
+  // Clear person filter
+  setPerson('');
+  // Clear date filters
+  document.getElementById('filter-from').value='';
+  document.getElementById('filter-to').value='';
+  render();
+}
+
 let activePerson='';
 function setPerson(p){
   activePerson=p;
@@ -229,11 +331,16 @@ function setPerson(p){
 function getFiltered(){
   const from=document.getElementById('filter-from').value;
   const to=document.getElementById('filter-to').value;
-  return entries.filter(e=>
-    (!from||e.date>=from)&&
-    (!to||e.date<=to)&&
-    (!activePerson||e.person===activePerson)
-  );
+  return entries.filter(e=>{
+    if(from && e.date<from) return false;
+    if(to && e.date>to) return false;
+    if(activePerson && e.person!==activePerson) return false;
+    if(activeInvoice){
+      if(e.bank!==activeInvoice.bank) return false;
+      if(e.date<activeInvoice.start || e.date>activeInvoice.end) return false;
+    }
+    return true;
+  });
 }
 
 function setQuick(type){
@@ -250,6 +357,8 @@ function setQuick(type){
 function clearFilter(){
   document.getElementById('filter-from').value='';
   document.getElementById('filter-to').value='';
+  activeInvoice=null;
+  document.querySelectorAll('.inv-chip').forEach(b=>b.classList.remove('active'));
   setPerson('');
 }
 
@@ -432,6 +541,7 @@ ref.on('value',snap=>{
 });
 
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+buildInvoiceChips();
 </script>
 </body>
 </html>
