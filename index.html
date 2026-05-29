@@ -8,6 +8,7 @@
 <title>Finanças do Casal</title>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -261,6 +262,19 @@ header{
   border-radius:var(--rs);transition:all .15s;
 }
 .del-btn:hover{color:var(--red);background:rgba(239,68,68,0.1)}
+.btn-pdf{
+  width:100%;padding:11px;margin-top:.5rem;
+  background:transparent;
+  color:var(--text2);
+  border:1px solid var(--border2);
+  border-radius:var(--rm);
+  font-family:'Inter',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:all .2s;
+}
+.btn-pdf:hover{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,0.07)}
+.btn-pdf:active{opacity:.8}
 .paid-btn{
   background:none;border:1px solid var(--border2);cursor:pointer;
   color:var(--text3);padding:3px 8px;line-height:1;
@@ -397,6 +411,10 @@ header{
     <div class="inv-bank-label"><span style="background:var(--green)"></span>Mercado Pago — Fecha dia 15 · Vence dia 20</div>
     <div class="invoice-chips" id="chips-mp"></div>
     <div class="finfo" id="finfo" style="display:none"></div>
+    <button class="btn-pdf" onclick="gerarPDF()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Gerar relatório em PDF
+    </button>
   </div>
 
   <!-- GRÁFICO POR BANCO -->
@@ -665,6 +683,174 @@ function render(){
     if(!entries.length){hist.innerHTML='<p class="empty">Nenhuma compra registrada</p>';return;}
     hist.innerHTML=[...entries].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
   }
+}
+
+function gerarPDF(){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const filtered=getFiltered();
+  const from=document.getElementById('filter-from').value;
+  const to=document.getElementById('filter-to').value;
+  const pw=210; // page width
+  const margin=14;
+  const usable=pw-margin*2;
+  let y=20;
+
+  const cor={accent:[99,102,241],green:[16,185,129],blue:[59,130,246],text:[30,30,40],text2:[120,118,140],border:[230,230,238]};
+
+  // Header background
+  doc.setFillColor(15,15,19);
+  doc.rect(0,0,pw,38,'F');
+
+  // Title
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(18);
+  doc.setTextColor(241,240,247);
+  doc.text('Finanças do Casal',margin,14);
+
+  // Subtitle / filter info
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...cor.text2);
+  let subtitle='Relatório de gastos';
+  if(activeInvoice){subtitle+=` — Fatura ${activeInvoice.bank} · ${fmtDate(activeInvoice.start)} a ${fmtDate(activeInvoice.end)}`;}
+  else if(from||to){const p=[];if(from)p.push(`de ${fmtDate(from)}`);if(to)p.push(`até ${fmtDate(to)}`);subtitle+=' — '+p.join(' ');}
+  if(activePerson)subtitle+=` — ${activePerson}`;
+  doc.text(subtitle,margin,21);
+
+  // Generated date
+  const now=new Date();
+  doc.text(`Gerado em ${now.toLocaleString('pt-BR')}`,margin,27);
+
+  y=46;
+
+  // Total card
+  const totalFilt=filtered.reduce((s,e)=>s+e.amount,0);
+  doc.setFillColor(26,26,46);
+  doc.roundedRect(margin,y,usable,18,3,3,'F');
+  doc.setFillColor(...cor.accent);
+  doc.roundedRect(margin,y,4,18,2,2,'F');
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...cor.text2);
+  doc.text('TOTAL DO PERÍODO',margin+8,y+6.5);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(14);
+  doc.setTextColor(241,240,247);
+  doc.text(fmt(totalFilt),margin+8,y+14);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...cor.text2);
+  doc.text(`${filtered.length} compra${filtered.length!==1?'s':''}`,pw-margin-2,y+10,{align:'right'});
+  y+=26;
+
+  // GROUP BY BANK
+  const byBank={};
+  filtered.forEach(e=>{if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
+  const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+e.amount,0)-a[1].reduce((s,e)=>s+e.amount,0));
+
+  bankOrder.forEach(([bank,items])=>{
+    const bankTotal=items.reduce((s,e)=>s+e.amount,0);
+    const bankColor=bank==='C6'?cor.blue:cor.green;
+
+    // Check page break
+    if(y>260){doc.addPage();y=16;}
+
+    // Bank header
+    doc.setFillColor(22,22,30);
+    doc.roundedRect(margin,y,usable,11,2,2,'F');
+    doc.setFillColor(...bankColor);
+    doc.circle(margin+6,y+5.5,2.5,'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(241,240,247);
+    doc.text(bank,margin+11,y+6.5);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...bankColor);
+    doc.text(fmt(bankTotal),pw-margin-2,y+6.5,{align:'right'});
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...cor.text2);
+    doc.text(`${items.length} compra${items.length!==1?'s':''}`,pw-margin-2,y+11.5,{align:'right'});
+    y+=15;
+
+    // Column headers
+    doc.setFillColor(235,235,245);
+    doc.rect(margin,y,usable,6,'F');
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...cor.text2);
+    doc.text('DATA',margin+2,y+4);
+    doc.text('DESCRIÇÃO',margin+22,y+4);
+    doc.text('PESSOA',margin+usable*0.62,y+4);
+    doc.text('STATUS',margin+usable*0.79,y+4);
+    doc.text('VALOR',pw-margin-2,y+4,{align:'right'});
+    y+=8;
+
+    // Items
+    const sorted=items.sort((a,b)=>b.date.localeCompare(a.date));
+    sorted.forEach((e,idx)=>{
+      if(y>272){doc.addPage();y=16;}
+      // Alternating row
+      if(idx%2===0){doc.setFillColor(248,248,252);doc.rect(margin,y-3,usable,7,'F');}
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...cor.text);
+      doc.text(fmtDate(e.date),margin+2,y+1);
+      // Truncate long names
+      const nameStr=e.name.length>28?e.name.substring(0,26)+'...':e.name;
+      doc.text(nameStr,margin+22,y+1);
+      doc.setTextColor(...cor.text2);
+      doc.text(e.person,margin+usable*0.62,y+1);
+      // Paid status
+      if(e.paid){
+        doc.setTextColor(...cor.green);
+        doc.text('✓ Pago',margin+usable*0.79,y+1);
+      } else {
+        doc.setTextColor(245,158,11);
+        doc.text('A receber',margin+usable*0.79,y+1);
+      }
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...cor.text);
+      doc.text(fmt(e.amount),pw-margin-2,y+1,{align:'right'});
+      y+=7;
+    });
+
+    // Bank subtotal row
+    doc.setDrawColor(...cor.border);
+    doc.line(margin,y,pw-margin,y);
+    y+=3;
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...bankColor);
+    doc.text(`Subtotal ${bank}`,margin+2,y+2);
+    doc.text(fmt(bankTotal),pw-margin-2,y+2,{align:'right'});
+    y+=10;
+  });
+
+  // Footer
+  const pageCount=doc.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFillColor(15,15,19);
+    doc.rect(0,285,pw,15,'F');
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...cor.text2);
+    doc.text('Finanças do Casal',margin,291);
+    doc.text(`Página ${i} de ${pageCount}`,pw-margin,291,{align:'right'});
+  }
+
+  // Build filename
+  let fname='relatorio';
+  if(activeInvoice)fname+=`_fatura_${activeInvoice.bank.replace(' ','_').toLowerCase()}`;
+  else if(from)fname+=`_${from}`;
+  if(activePerson)fname+=`_${activePerson.replace(' ','_').toLowerCase()}`;
+  fname+='.pdf';
+
+  doc.save(fname);
 }
 
 function addEntry(){
