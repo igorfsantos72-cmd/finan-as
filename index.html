@@ -1,51 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Finanças">
-<title>Finanças do Casal</title>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --accent:#6366f1;
-  --accent2:#8b5cf6;
-  --green:#10b981;
-  --blue:#3b82f6;
-  --orange:#f97316;
-  --red:#ef4444;
-  --bg:#0f0f13;
-  --bg2:#16161d;
-  --bg3:#1e1e28;
-  --bg4:#252532;
-  --text:#f1f0f7;
-  --text2:#9896b0;
-  --text3:#5c5a72;
-  --border:rgba(255,255,255,0.06);
-  --border2:rgba(255,255,255,0.1);
-  --r:16px;--rm:10px;--rs:6px;
-  --shadow:0 4px 24px rgba(0,0,0,0.4);
-  --shadow-sm:0 2px 8px rgba(0,0,0,0.3);
-}
-body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:'Inter',sans-serif;
-  font-size:14px;
-  min-height:100vh;
-  padding-bottom:3rem;
-}
-
-/* HEADER */
-header{
-  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
-  padding:1.25rem 1.25rem 1rem;
-  position:sticky;top:0;z-index:100;
   border-bottom:1px solid rgba(99,102,241,0.2);
 }
 .header-inner{display:flex;align-items:center;justify-content:space-between}
@@ -145,6 +97,26 @@ header{
 .total-label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
 .total-value{font-size:26px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(135deg,#fff,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .total-icon{width:44px;height:44px;border-radius:12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1}
+.total-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.total-card-sm{
+  background:linear-gradient(135deg,#1a1a2e,#1e1e35);
+  border:1px solid rgba(99,102,241,0.25);
+  border-radius:var(--r);padding:.9rem 1rem;
+  position:relative;overflow:hidden;
+}
+.total-card-sm.receber{
+  background:linear-gradient(135deg,#0d1f1a,#0f2a1e);
+  border-color:rgba(245,158,11,0.25);
+}
+.total-card-sm.receber.zerado{
+  background:linear-gradient(135deg,#0a1f14,#0d2a1a);
+  border-color:rgba(16,185,129,0.25);
+}
+.total-card-sm .total-label{font-size:10px}
+.total-card-sm .total-value{font-size:20px}
+.total-card-sm.receber .total-value{background:linear-gradient(135deg,#fbbf24,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.total-card-sm.receber.zerado .total-value{background:linear-gradient(135deg,#34d399,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.receber-sub{font-size:10px;color:var(--text3);margin-top:3px}
 
 /* FILTER CHIPS */
 .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.65rem}
@@ -435,14 +407,16 @@ header{
     <div id="bank-person-bars"></div>
   </div>
 
-  <!-- TOTAL -->
-  <div class="total-card">
-    <div>
+  <!-- TOTAIS -->
+  <div class="total-grid">
+    <div class="total-card total-card-sm">
       <div class="total-label">Total geral</div>
       <div class="total-value" id="total-geral">—</div>
     </div>
-    <div class="total-icon">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    <div class="total-card-sm receber" id="card-receber">
+      <div class="total-label">A receber</div>
+      <div class="total-value" id="total-receber">—</div>
+      <div class="receber-sub" id="receber-sub"></div>
     </div>
   </div>
 
@@ -643,6 +617,21 @@ function render(){
   const to=document.getElementById('filter-to').value;
   const total=entries.reduce((s,e)=>s+e.amount,0);
   document.getElementById('total-geral').textContent=fmt(total);
+
+  // A receber — unpaid entries from filtered
+  const unpaid=filtered.filter(e=>!e.paid);
+  const paid=filtered.filter(e=>e.paid);
+  const totalReceber=unpaid.reduce((s,e)=>s+e.amount,0);
+  const totalPago=paid.reduce((s,e)=>s+e.amount,0);
+  const cardReceber=document.getElementById('card-receber');
+  document.getElementById('total-receber').textContent=fmt(totalReceber);
+  if(totalReceber===0){
+    cardReceber.className='total-card-sm receber zerado';
+    document.getElementById('receber-sub').textContent=`Tudo quitado ✓`;
+  } else {
+    cardReceber.className='total-card-sm receber';
+    document.getElementById('receber-sub').textContent=`${unpaid.length} pendente${unpaid.length!==1?'s':''}${paid.length?` · ${fmt(totalPago)} recebido`:''}`;
+  }
 
   const fi=document.getElementById('finfo');
   const ft=filtered.reduce((s,e)=>s+e.amount,0);
