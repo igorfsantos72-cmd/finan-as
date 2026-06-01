@@ -512,22 +512,31 @@ function getInvoiceCycle(bank,year,month){
 }
 function buildInvoiceChips(){
   const today=new Date();
-  ['C6','MERCADO PAGO'].forEach(bank=>{
-    const el=document.getElementById(bank==='C6'?'chips-c6':'chips-mp');
-    if(!el)return;
-    const chips=[];const seen=new Set();
-    for(let i=-1;i<=5;i++){
-      const ref2=new Date(today.getFullYear(),today.getMonth()-i+1,1);
-      const c=getInvoiceCycle(bank,ref2.getFullYear(),ref2.getMonth()+1);
-      if(!c||seen.has(c.startStr))continue;
-      seen.add(c.startStr);chips.push({...c,bank});
-    }
-    el.innerHTML=chips.slice(0,7).map(c=>{
-      const cls=bank==='MERCADO PAGO'?'inv-chip mp':'inv-chip';
-      const mn=new Date(c.endStr+'T12:00:00').toLocaleString('pt-BR',{month:'short',year:'2-digit'});
-      return`<button class="${cls}" onclick="setInvoice('${bank}','${c.startStr}','${c.endStr}')" data-start="${c.startStr}" data-end="${c.endStr}" data-bank="${bank}">${mn.charAt(0).toUpperCase()+mn.slice(1)}<span class="inv-due">Vence ${c.dueStr.split('-').reverse().join('/')}</span></button>`;
-    }).join('');
-  });
+  const el=document.getElementById('chips-fatura');
+  if(!el)return;
+  // Use Mercado Pago cycle dates as reference for the month label
+  // Each button covers: earliest start of both banks to latest end of both banks
+  const seen=new Set();
+  const chips=[];
+  for(let i=-1;i<=6;i++){
+    const ref2=new Date(today.getFullYear(),today.getMonth()-i+1,1);
+    const yr=ref2.getFullYear();
+    const mo=ref2.getMonth()+1;
+    const c6=getInvoiceCycle('C6',yr,mo);
+    const mp=getInvoiceCycle('MERCADO PAGO',yr,mo);
+    if(!c6||!mp)continue;
+    // unified range: earliest start, latest end
+    const start=c6.startStr<mp.startStr?c6.startStr:mp.startStr;
+    const end=c6.endStr>mp.endStr?c6.endStr:mp.endStr;
+    if(seen.has(start))continue;
+    seen.add(start);
+    const label=new Date(mp.endStr+'T12:00:00').toLocaleString('pt-BR',{month:'short',year:'2-digit'});
+    chips.push({start,end,label});
+  }
+  el.innerHTML=chips.slice(0,7).map(c=>{
+    const cap=c.label.charAt(0).toUpperCase()+c.label.slice(1);
+    return`<button class="inv-chip" onclick="setInvoice('${c.start}','${c.end}')" data-start="${c.start}">${cap}</button>`;
+  }).join('');
 }
 let activeInvoice=null;
 function setInvoice(start,end){
