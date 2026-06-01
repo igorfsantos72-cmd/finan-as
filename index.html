@@ -407,10 +407,7 @@ header{
     </div>
     <div class="section-divider"></div>
     <div class="chips-label" style="margin-bottom:.5rem">Por fatura</div>
-    <div class="inv-bank-label"><span style="background:var(--blue)"></span>C6 — Fecha dia 22 · Vence dia 01</div>
-    <div class="invoice-chips" id="chips-c6"></div>
-    <div class="inv-bank-label"><span style="background:var(--green)"></span>Mercado Pago — Fecha dia 15 · Vence dia 20</div>
-    <div class="invoice-chips" id="chips-mp"></div>
+    <div class="invoice-chips" id="chips-fatura"></div>
     <div class="finfo" id="finfo" style="display:none"></div>
     <button class="btn-pdf" onclick="gerarPDF()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -533,12 +530,12 @@ function buildInvoiceChips(){
   });
 }
 let activeInvoice=null;
-function setInvoice(bank,start,end){
-  if(activeInvoice&&activeInvoice.bank===bank&&activeInvoice.start===start){
+function setInvoice(start,end){
+  if(activeInvoice&&activeInvoice.start===start){
     activeInvoice=null;document.querySelectorAll('.inv-chip').forEach(b=>b.classList.remove('active'));render();return;
   }
-  activeInvoice={bank,start,end};
-  document.querySelectorAll('.inv-chip').forEach(b=>b.classList.toggle('active',b.dataset.start===start&&b.dataset.bank===bank));
+  activeInvoice={start,end};
+  document.querySelectorAll('.inv-chip').forEach(b=>b.classList.toggle('active',b.dataset.start===start));
   setPerson('');
   document.getElementById('filter-from').value='';document.getElementById('filter-to').value='';
   render();
@@ -559,7 +556,7 @@ function getFiltered(){
     if(from&&e.date<from)return false;
     if(to&&e.date>to)return false;
     if(activePerson&&e.person!==activePerson)return false;
-    if(activeInvoice){if(e.bank!==activeInvoice.bank)return false;if(e.date<activeInvoice.start||e.date>activeInvoice.end)return false;}
+    if(activeInvoice){if(e.date<activeInvoice.start||e.date>activeInvoice.end)return false;}
     return true;
   });
 }
@@ -643,7 +640,7 @@ function render(){
   const fi=document.getElementById('finfo');
   const ft=filtered.reduce((s,e)=>s+e.amount,0);
   const parts=[];
-  if(activeInvoice){parts.push(`Fatura ${activeInvoice.bank} · ${fmtDate(activeInvoice.start)} a ${fmtDate(activeInvoice.end)}`);}
+  if(activeInvoice){parts.push(`Fatura ${fmtDate(activeInvoice.start)} a ${fmtDate(activeInvoice.end)}`);}
   else{if(from)parts.push(`de ${fmtDate(from)}`);if(to)parts.push(`até ${fmtDate(to)}`);}
   if(activePerson)parts.push(`· ${activePerson}`);
   if(parts.length||from||to||activeInvoice||activePerson){
@@ -709,7 +706,7 @@ function gerarPDF(){
   doc.setFontSize(9);
   doc.setTextColor(...cor.text2);
   let subtitle='Relatório de gastos';
-  if(activeInvoice){subtitle+=` — Fatura ${activeInvoice.bank} · ${fmtDate(activeInvoice.start)} a ${fmtDate(activeInvoice.end)}`;}
+  if(activeInvoice){subtitle+=` — Fatura ${fmtDate(activeInvoice.start)} a ${fmtDate(activeInvoice.end)}`;}
   else if(from||to){const p=[];if(from)p.push(`de ${fmtDate(from)}`);if(to)p.push(`até ${fmtDate(to)}`);subtitle+=' — '+p.join(' ');}
   if(activePerson)subtitle+=` — ${activePerson}`;
   doc.text(subtitle,margin,21);
@@ -841,7 +838,7 @@ function gerarPDF(){
 
   // Build filename
   let fname='relatorio';
-  if(activeInvoice)fname+=`_fatura_${activeInvoice.bank.replace(' ','_').toLowerCase()}`;
+  if(activeInvoice)fname+=`_fatura_${activeInvoice.start}`;
   else if(from)fname+=`_${from}`;
   if(activePerson)fname+=`_${activePerson.replace(' ','_').toLowerCase()}`;
   fname+='.pdf';
