@@ -726,33 +726,48 @@ function gerarPDF(){
 
   y=46;
 
-  // Total card
-  const totalFilt=filtered.reduce((s,e)=>s+e.amount,0);
+  // Totals
+  const totalBruto=filtered.reduce((s,e)=>s+e.amount,0);
+  const totalPago=filtered.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
+  const totalLiquido=totalBruto-totalPago;
+  const countPago=filtered.filter(e=>e.paid).length;
+  const countPendente=filtered.filter(e=>!e.paid).length;
+
+  // Total card — mostra apenas o líquido (já subtraindo os pagos)
   doc.setFillColor(26,26,46);
-  doc.roundedRect(margin,y,usable,18,3,3,'F');
+  doc.roundedRect(margin,y,usable,20,3,3,'F');
   doc.setFillColor(...cor.accent);
-  doc.roundedRect(margin,y,4,18,2,2,'F');
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...cor.text2);
-  doc.text('TOTAL DO PERÍODO',margin+8,y+6.5);
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(14);
-  doc.setTextColor(241,240,247);
-  doc.text(fmt(totalFilt),margin+8,y+14);
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...cor.text2);
-  doc.text(`${filtered.length} compra${filtered.length!==1?'s':''}`,pw-margin-2,y+10,{align:'right'});
-  y+=26;
+  doc.roundedRect(margin,y,4,20,2,2,'F');
+
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...cor.text2);
+  doc.text('TOTAL DO PERÍODO',margin+8,y+6);
+  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(241,240,247);
+  doc.text(fmt(totalLiquido),margin+8,y+14);
+
+  // Info direita
+  doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...cor.text2);
+  doc.text(`${filtered.length} compra${filtered.length!==1?'s':''}`,pw-margin-2,y+6,{align:'right'});
+  if(totalPago>0){
+    doc.setTextColor(...cor.green);
+    doc.text(`${countPago} paga${countPago!==1?'s':''} (- ${fmt(totalPago)})`,pw-margin-2,y+11,{align:'right'});
+    doc.setTextColor(245,158,11);
+    doc.text(`${countPendente} pendente${countPendente!==1?'s':''}`,pw-margin-2,y+16,{align:'right'});
+  }
+  y+=28;
 
   // GROUP BY BANK
   const byBank={};
   filtered.forEach(e=>{if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
-  const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+e.amount,0)-a[1].reduce((s,e)=>s+e.amount,0));
+  const bankOrder=Object.entries(byBank).sort((a,b)=>{
+    const ua=b[1].filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0);
+    const ub=a[1].filter(e=>!e.paid).reduce((s,e)=>s+e.amount,0);
+    return ua-ub;
+  });
 
   bankOrder.forEach(([bank,items])=>{
-    const bankTotal=items.reduce((s,e)=>s+e.amount,0);
+    const bankBruto=items.reduce((s,e)=>s+e.amount,0);
+    const bankPago=items.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
+    const bankTotal=bankBruto-bankPago;
     const bankColor=bank==='C6'?cor.blue:cor.green;
 
     // Check page break
@@ -760,22 +775,16 @@ function gerarPDF(){
 
     // Bank header
     doc.setFillColor(22,22,30);
-    doc.roundedRect(margin,y,usable,11,2,2,'F');
+    doc.roundedRect(margin,y,usable,14,2,2,'F');
     doc.setFillColor(...bankColor);
-    doc.circle(margin+6,y+5.5,2.5,'F');
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(10);
-    doc.setTextColor(241,240,247);
-    doc.text(bank,margin+11,y+6.5);
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...bankColor);
-    doc.text(fmt(bankTotal),pw-margin-2,y+6.5,{align:'right'});
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...cor.text2);
-    doc.text(`${items.length} compra${items.length!==1?'s':''}`,pw-margin-2,y+11.5,{align:'right'});
-    y+=15;
+    doc.circle(margin+6,y+7,2.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(241,240,247);
+    doc.text(bank,margin+11,y+8);
+    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(...bankColor);
+    doc.text(fmt(bankTotal),pw-margin-2,y+8,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...cor.text2);
+    doc.text(`${items.length} compra${items.length!==1?'s':''}  |  bruto ${fmt(bankBruto)}  |  recebido ${fmt(bankPago)}`,margin+11,y+13);
+    y+=18;
 
     // Column headers
     doc.setFillColor(235,235,245);
@@ -824,12 +833,12 @@ function gerarPDF(){
     doc.setDrawColor(...cor.border);
     doc.line(margin,y,pw-margin,y);
     y+=3;
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...bankColor);
-    doc.text(`Subtotal ${bank}`,margin+2,y+2);
-    doc.text(fmt(bankTotal),pw-margin-2,y+2,{align:'right'});
-    y+=10;
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(...bankColor);
+    doc.text(`Subtotal ${bank}`,margin+2,y+3);
+    doc.text(fmt(bankTotal),pw-margin-2,y+3,{align:'right'});
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(...cor.text2);
+    if(bankPago>0){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...cor.green);doc.text(`(${fmt(bankBruto)} - ${fmt(bankPago)} recebido)`,pw-margin-2,y+8,{align:'right'});}
+    y+=13;
   });
 
   // Footer
