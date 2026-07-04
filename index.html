@@ -128,6 +128,32 @@ header{
 }
 .btn-add:active{opacity:.85;transform:scale(.99)}
 .btn-add:disabled{opacity:.4;cursor:not-allowed}
+.parcel-toggle{
+  display:flex;align-items:center;gap:8px;
+  margin-top:.65rem;padding:.65rem .85rem;
+  background:var(--bg3);border:1px solid var(--border2);
+  border-radius:var(--rm);cursor:pointer;user-select:none;
+}
+.parcel-toggle input[type=checkbox]{
+  width:16px;height:16px;accent-color:var(--accent);
+  flex-shrink:0;cursor:pointer;
+}
+.parcel-toggle label{font-size:13px;color:var(--text2);cursor:pointer;flex:1}
+.parcel-fields{
+  display:none;grid-template-columns:1fr 1fr;gap:.65rem;
+  margin-top:.65rem;
+}
+.parcel-fields.show{display:grid}
+.parcel-preview{
+  font-size:11px;color:var(--text2);
+  background:rgba(99,102,241,0.07);
+  border:1px solid rgba(99,102,241,0.2);
+  border-radius:var(--rs);padding:7px 10px;
+  margin-top:.5rem;line-height:1.6;
+  display:none;
+}
+.parcel-preview.show{display:block}
+.parcel-preview strong{color:var(--text)}
 
 /* TOTAL */
 .total-card{
@@ -359,6 +385,22 @@ header{
         </select>
       </div>
     </div>
+    <div class="parcel-toggle" onclick="toggleParcel()">
+      <input type="checkbox" id="chk-parcel" onclick="event.stopPropagation();toggleParcel()">
+      <label for="chk-parcel">Compra parcelada</label>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--text3)"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    </div>
+    <div class="parcel-fields" id="parcel-fields">
+      <div class="field">
+        <label>Nº de parcelas</label>
+        <input type="number" id="inp-parcelas" placeholder="Ex: 10" min="2" max="60" step="1" inputmode="numeric" oninput="updateParcelPreview()">
+      </div>
+      <div class="field">
+        <label>Parcela atual</label>
+        <input type="number" id="inp-parcela-atual" placeholder="Ex: 1" min="1" max="60" step="1" inputmode="numeric" oninput="updateParcelPreview()">
+      </div>
+    </div>
+    <div class="parcel-preview" id="parcel-preview"></div>
     <button class="btn-add" id="btn-add" onclick="addEntry()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Adicionar compra
@@ -864,6 +906,39 @@ function gerarPDF(){
   doc.save(fname);
 }
 
+function toggleParcel(){
+  const chk=document.getElementById('chk-parcel');
+  const fields=document.getElementById('parcel-fields');
+  const preview=document.getElementById('parcel-preview');
+  chk.checked=!chk.checked;
+  fields.classList.toggle('show',chk.checked);
+  if(!chk.checked){preview.classList.remove('show');preview.innerHTML='';}
+  else{updateParcelPreview();}
+}
+
+function addMonths(dateStr,months){
+  const[y,m,d]=dateStr.split('-').map(Number);
+  const dt=new Date(y,m-1+months,d);
+  // If day overflows (e.g. Jan 31 + 1 month), clamp to last day of month
+  if(dt.getDate()!==d){dt.setDate(0);}
+  return dt.toISOString().split('T')[0];
+}
+
+function updateParcelPreview(){
+  const date=document.getElementById('inp-date').value;
+  const name=document.getElementById('inp-name').value.trim();
+  const amount=parseFloat(document.getElementById('inp-amount').value);
+  const total=parseInt(document.getElementById('inp-parcelas').value);
+  const atual=parseInt(document.getElementById('inp-parcela-atual').value)||1;
+  const preview=document.getElementById('parcel-preview');
+  if(!date||!total||total<2){preview.classList.remove('show');return;}
+  const remaining=total-atual+1;
+  const firstName=name?`<strong>${name}</strong>`:'a compra';
+  const lastDate=addMonths(date,remaining-1);
+  preview.classList.add('show');
+  preview.innerHTML=`Serão criadas <strong>${remaining}</strong> parcela${remaining!==1?'s':''} de ${firstName} (${atual}/${total} até ${total}/${total})<br>Da data <strong>${fmtDate(date)}</strong> até <strong>${fmtDate(lastDate)}</strong>`;
+}
+
 function addEntry(){
   const date=document.getElementById('inp-date').value;
   const name=document.getElementById('inp-name').value.trim();
@@ -871,13 +946,46 @@ function addEntry(){
   const bank=document.getElementById('inp-bank').value;
   const amount=parseFloat(document.getElementById('inp-amount').value);
   if(!date||!name||!person||!bank||isNaN(amount)||amount<=0){alert('Preencha todos os campos com valores válidos.');return;}
+
+  const isParcel=document.getElementById('chk-parcel').checked;
+  const totalParcelas=parseInt(document.getElementById('inp-parcelas').value)||0;
+  const parcelaAtual=parseInt(document.getElementById('inp-parcela-atual').value)||1;
+
   const btn=document.getElementById('btn-add');btn.disabled=true;
-  const newRef=ref.push();
-  newRef.set({id:newRef.key,date,name,person,bank,amount},err=>{
-    btn.disabled=false;
-    if(!err){document.getElementById('inp-name').value='';document.getElementById('inp-person').value='';document.getElementById('inp-bank').value='';document.getElementById('inp-amount').value='';}
-    else{alert('Erro ao salvar. Verifique sua conexão.');}
-  });
+
+  if(isParcel&&totalParcelas>=2){
+    // Create one entry per remaining installment
+    const remaining=totalParcelas-parcelaAtual+1;
+    const updates={};
+    for(let i=0;i<remaining;i++){
+      const parNum=parcelaAtual+i;
+      const parDate=addMonths(date,i);
+      const parName=`${name} ${parNum}/${totalParcelas}`;
+      const newRef2=ref.push();
+      updates[newRef2.key]={id:newRef2.key,date:parDate,name:parName,person,bank,amount,paid:false};
+    }
+    ref.update(updates,err=>{
+      btn.disabled=false;
+      if(!err){
+        document.getElementById('inp-name').value='';
+        document.getElementById('inp-person').value='';
+        document.getElementById('inp-bank').value='';
+        document.getElementById('inp-amount').value='';
+        document.getElementById('inp-parcelas').value='';
+        document.getElementById('inp-parcela-atual').value='';
+        document.getElementById('chk-parcel').checked=false;
+        document.getElementById('parcel-fields').classList.remove('show');
+        document.getElementById('parcel-preview').classList.remove('show');
+      } else {alert('Erro ao salvar parcelas. Verifique sua conexão.');}
+    });
+  } else {
+    const newRef=ref.push();
+    newRef.set({id:newRef.key,date,name,person,bank,amount,paid:false},err=>{
+      btn.disabled=false;
+      if(!err){document.getElementById('inp-name').value='';document.getElementById('inp-person').value='';document.getElementById('inp-bank').value='';document.getElementById('inp-amount').value='';}
+      else{alert('Erro ao salvar. Verifique sua conexão.');}
+    });
+  }
 }
 function removeEntry(id){if(!confirm('Remover esta compra?'))return;ref.child(id).remove();}
 
@@ -892,3 +1000,4 @@ buildInvoiceChips();
 </script>
 </body>
 </html>
+7
