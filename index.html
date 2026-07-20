@@ -666,6 +666,7 @@ function clearFilter(){
   document.getElementById('filter-from').value='';document.getElementById('filter-to').value='';
   activeInvoice=null;document.querySelectorAll('.inv-chip').forEach(b=>b.classList.remove('active'));
   setPerson('');
+  render();
 }
 function sumBy(list,key,onlyUnpaid=false){
   const map={};
@@ -837,8 +838,8 @@ function render(){
     renderBars('bank-bars',sumBy(filtered,'bank',true),'bank');
     renderBars('person-bars',sumBy(filtered,'person',false),'person');
     const hist=document.getElementById('history');
-    if(!entries.length){hist.innerHTML='<p class="empty">Nenhuma compra registrada</p>';return;}
-    hist.innerHTML=[...entries].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
+    if(!filtered.length){hist.innerHTML='<p class="empty">Nenhuma compra neste período</p>';return;}
+    hist.innerHTML=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
   }
 }
 
