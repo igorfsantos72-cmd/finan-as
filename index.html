@@ -362,6 +362,20 @@ header{
 .bank-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .bank-section-total{font-size:13px;font-weight:700}
 .bank-section-count{font-size:10px;color:var(--text3);margin-left:2px;font-weight:400}
+.bank-paid-info{font-size:10px;color:var(--green);display:block;text-align:right;margin-top:1px}
+.charts-section{display:flex;flex-direction:column;gap:.85rem;margin-top:.85rem}
+.donut-wrap{display:flex;flex-direction:column;align-items:center;gap:.8rem}
+.donut-row{display:flex;align-items:center;justify-content:center;gap:1.2rem;width:100%}
+.donut-svg{flex-shrink:0}
+.donut-legend{display:flex;flex-direction:column;gap:.35rem;flex:1;min-width:0}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.legend-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend-val{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap}
+.legend-pct{font-size:10px;color:var(--text3);white-space:nowrap;margin-left:2px}
+.chart-tabs{display:flex;gap:.4rem;margin-bottom:.7rem}
+.ctab{flex:1;padding:6px 4px;font-size:11px;font-weight:500;border-radius:20px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:'Inter',sans-serif;transition:all .15s;text-align:center}
+.ctab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* EMPTY */
 .empty{
@@ -822,21 +836,26 @@ function render(){
     chartBank.style.display='none';chartPerson.style.display='none';cardBankPerson.style.display='';
     document.getElementById('bank-person-label').textContent='Gastos por banco — '+activePerson;
     renderBars('bank-person-bars',sumBy(filtered,'bank',true),'bank');
+    renderCharts();
     histLabel.textContent='Compras de '+activePerson;
     const hist=document.getElementById('history');
     if(!filtered.length){hist.innerHTML='<p class="empty">Nenhuma compra encontrada</p>';return;}
     const byBank={};filtered.forEach(e=>{if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
     const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+e.amount,0)-a[1].reduce((s,e)=>s+e.amount,0));
     hist.innerHTML=bankOrder.map(([bank,items])=>{
-      const t=items.reduce((s,e)=>s+e.amount,0);
+      const tBruto=items.reduce((s,e)=>s+e.amount,0);
+      const tPago=items.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
+      const tLiq=tBruto-tPago;
       const bc=BANK_C[BANKS.indexOf(bank)]??'#6366f1';
-      return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div class="bank-section-total">${fmt(t)}</div></div>${items.sort((a,b)=>b.date.localeCompare(a.date)).map(renderItem).join('')}</div>`;
+      const paidInfo=tPago>0?`<span class="bank-paid-info">- ${fmt(tPago)} recebido</span>`:'';
+      return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div><div class="bank-section-total">${fmt(tLiq)}</div>${paidInfo}</div></div>${items.sort((a,b)=>b.date.localeCompare(a.date)).map(renderItem).join('')}</div>`;
     }).join('');
   } else {
     chartBank.style.display='';chartPerson.style.display='';cardBankPerson.style.display='none';
     histLabel.textContent='Histórico de compras';
     renderBars('bank-bars',sumBy(filtered,'bank',true),'bank');
     renderBars('person-bars',sumBy(filtered,'person',false),'person');
+    renderCharts();
     const hist=document.getElementById('history');
     if(!filtered.length){hist.innerHTML='<p class="empty">Nenhuma compra neste período</p>';return;}
     hist.innerHTML=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
@@ -1051,6 +1070,80 @@ function updateParcelPreview(){
   const lastDate=addMonths(date,remaining-1);
   preview.classList.add('show');
   preview.innerHTML=`Serão criadas <strong>${remaining}</strong> parcela${remaining!==1?'s':''} de ${firstName} (${atual}/${total} até ${total}/${total})<br>Da data <strong>${fmtDate(date)}</strong> até <strong>${fmtDate(lastDate)}</strong>`;
+}
+
+let chartTab='pessoa';
+function setChartTab(tab){
+  chartTab=tab;
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(tab==='pessoa'?'Por pessoa':'Por banco')));
+  renderCharts();
+}
+
+function renderDonut(containerId, data, colors){
+  const el=document.getElementById(containerId);
+  if(!data.length){el.innerHTML='<p class="empty">Nenhuma compra no período</p>';return;}
+  const total=data.reduce((s,[,v])=>s+v,0);
+  if(total===0){el.innerHTML='<p class="empty">Sem gastos pendentes</p>';return;}
+
+  // Build SVG donut
+  const size=130;const cx=size/2;const cy=size/2;const r=48;const inner=30;
+  let startAngle=-Math.PI/2;
+  let arcs='';
+  data.forEach(([name,val],i)=>{
+    const pct=val/total;
+    const angle=pct*2*Math.PI;
+    const x1=cx+r*Math.cos(startAngle);
+    const y1=cy+r*Math.sin(startAngle);
+    const x2=cx+r*Math.cos(startAngle+angle);
+    const y2=cy+r*Math.sin(startAngle+angle);
+    const xi1=cx+inner*Math.cos(startAngle);
+    const yi1=cy+inner*Math.sin(startAngle);
+    const xi2=cx+inner*Math.cos(startAngle+angle);
+    const yi2=cy+inner*Math.sin(startAngle+angle);
+    const large=angle>Math.PI?1:0;
+    const c=colors[i%colors.length];
+    arcs+=`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} L${xi2.toFixed(2)},${yi2.toFixed(2)} A${inner},${inner} 0 ${large},0 ${xi1.toFixed(2)},${yi1.toFixed(2)} Z" fill="${c}" opacity="0.9"/>`;
+    startAngle+=angle;
+  });
+
+  const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/>
+    ${arcs}
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text>
+    <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text>
+  </svg>`;
+
+  const legend=data.slice(0,8).map(([name,val],i)=>{
+    const pct=(val/total*100).toFixed(1);
+    return`<div class="legend-item">
+      <div class="legend-dot" style="background:${colors[i%colors.length]}"></div>
+      <span class="legend-name" title="${name}">${name}</span>
+      <span class="legend-val">${fmt(val)}</span>
+      <span class="legend-pct">${pct}%</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
+}
+
+function renderCharts(){
+  const filtered=getFiltered();
+  const wrap=document.getElementById('donut-wrap');
+  if(!filtered.length){wrap.innerHTML='<p class="empty">Nenhuma compra no período</p>';return;}
+
+  const personColors=Object.values(PC).map(c=>c[1]);
+  const bankColors=BANK_C;
+
+  if(chartTab==='pessoa'){
+    const data=sumBy(filtered,'person',false);
+    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]);
+    wrap.id='donut-wrap';
+    renderDonut('donut-wrap',data,colors);
+  } else {
+    const data=sumBy(filtered,'bank',false);
+    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1');
+    renderDonut('donut-wrap',data,colors);
+  }
 }
 
 function addEntry(){
