@@ -753,17 +753,7 @@ function deleteSelected(){
   });
 }
 
-// Auto-delete purchases older than 2 months
-function autoDeleteOld(){
-  const cutoff=new Date();
-  cutoff.setMonth(cutoff.getMonth()-2);
-  const cutoffStr=cutoff.toISOString().split('T')[0];
-  const toDelete=entries.filter(e=>e.date<cutoffStr);
-  if(!toDelete.length)return;
-  const updates={};
-  toDelete.forEach(e=>{updates[e.id]=null;});
-  ref.update(updates);
-}
+
 
 function toggleHistory(){
   histOpen=!histOpen;
@@ -1199,7 +1189,7 @@ function removeEntry(id){if(!confirm('Remover esta compra?'))return;ref.child(id
 ref.once('value',snap=>{if(!snap.exists()){const b={};PRELOADED.forEach(e=>{b[e.id]=e;});ref.set(b);}});
 ref.on('value',snap=>{
   entries=[];if(snap.exists()){snap.forEach(child=>{entries.push(child.val());});}
-  setSync('ok','sincronizado');render();autoDeleteOld();
+  setSync('ok','sincronizado');render();
 },()=>{setSync('err','erro de conexão');});
 
 document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
