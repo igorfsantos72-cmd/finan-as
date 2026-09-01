@@ -310,7 +310,9 @@ header{
       <button class="ctab active" onclick="setChartTab('pessoa')">Por pessoa</button>
       <button class="ctab" onclick="setChartTab('banco')">Por banco</button>
     </div>
-    <div id="donut-wrap" class="donut-wrap"></div>
+    <div id="donut-wrap" class="donut-wrap">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- 2. FILTROS -->
@@ -387,7 +389,7 @@ header{
       <div id="history">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          <p>Nenhuma compra registrada</p>
+          <p>Carregando histórico...</p>
         </div>
       </div>
     </div>
@@ -396,13 +398,17 @@ header{
   <!-- 4. GRÁFICO POR BANCO -->
   <div class="card" id="card-bank">
     <div class="lbl">Gastos por banco</div>
-    <div id="bank-bars"></div>
+    <div id="bank-bars">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
-    <div id="person-bars"></div>
+    <div id="person-bars">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
@@ -862,15 +868,13 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente
-";
+  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente\n";
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}
-`;
+    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
@@ -1088,8 +1092,43 @@ function removeEntry(id) {
   showToast('Compra apagada!', 'success');
 }
 
+const PRELOADED=[
+  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90},
+  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99},
+  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00},
+  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00},
+  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4 PARCELA",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00},
+  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80},
+  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99},
+  {id:'pre8',date:"2026-05-16",name:"CADEIRA MASSAGEM",person:"IGOR",bank:"MERCADO PAGO",amount:10.00},
+  {id:'pre9',date:"2026-05-19",name:"ENERGETICO ANTIACIDENTE",person:"IGOR",bank:"MERCADO PAGO",amount:15.50},
+  {id:'pre10',date:"2026-05-19",name:"SALGADO ANTIACIDENTE",person:"IGOR",bank:"MERCADO PAGO",amount:7.00},
+  {id:'pre11',date:"2026-05-19",name:"ML ABASTECIMENTO POLO",person:"IGOR",bank:"MERCADO PAGO",amount:204.32},
+  {id:'pre12',date:"2025-12-02",name:"AFPESP AVARE 7/10",person:"NÓS",bank:"MERCADO PAGO",amount:92.00},
+  {id:'pre13',date:"2026-04-18",name:"AFPESP IBIRA 2/10",person:"NÓS",bank:"MERCADO PAGO",amount:91.50},
+  {id:'pre14',date:"2026-04-20",name:"RIPADO 2/4",person:"NÓS",bank:"MERCADO PAGO",amount:46.40},
+  {id:'pre15',date:"2026-04-23",name:"ASPIRADOR 2/21",person:"NÓS",bank:"MERCADO PAGO",amount:82.63},
+  {id:'pre16',date:"2026-05-16",name:"TORNEIRA COZINHA",person:"NÓS",bank:"MERCADO PAGO",amount:86.99},
+  {id:'pre17',date:"2026-05-16",name:"DISPENSER DETERGENTE EMBUTIR",person:"NÓS",bank:"MERCADO PAGO",amount:22.89},
+  {id:'pre18',date:"2026-05-16",name:"SUPORTE BUCHA",person:"NÓS",bank:"MERCADO PAGO",amount:11.64},
+  {id:'pre19',date:"2026-05-16",name:"KIT BROCA DIAMANTADA MARMORE",person:"NÓS",bank:"MERCADO PAGO",amount:29.99},
+  {id:'pre20',date:"2026-05-16",name:"SUPORTE OVO MARAVILHAS",person:"NÓS",bank:"MERCADO PAGO",amount:26.97},
+  {id:'pre21',date:"2026-05-16",name:"ARANDELA DE BATERIA AMOR",person:"NÓS",bank:"MERCADO PAGO",amount:35.00},
+  {id:'pre22',date:"2026-05-17",name:"BATERIA PARAFUSADEIRA",person:"NÓS",bank:"MERCADO PAGO",amount:38.99},
+  {id:'pre23',date:"2026-05-18",name:"RADIADOR POLO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:702.00},
+  {id:'pre24',date:"2025-06-15",name:"PC",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:32.07},
+  {id:'pre25',date:"2025-06-15",name:"TELA",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:98.57},
+  {id:'pre26',date:"2026-04-19",name:"MAQUINA DE GELO 2/4",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:86.58},
+  {id:'pre27',date:"2026-05-17",name:"CODATTO - GUARDADO NO COFRINHO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:100.45},
+  {id:'pre28',date:"2026-05-18",name:"TRAVESSEIRO",person:"PAIS IGOR",bank:"MERCADO PAGO",amount:45.99}
+];
+
 ref.once('value', snap => {
-  if(!snap.exists()){ }
+  if(!snap.exists()){ 
+    const b = {};
+    PRELOADED.forEach(e => { b[e.id] = e; });
+    ref.set(b);
+  }
 });
 
 ref.on('value', snap => {
