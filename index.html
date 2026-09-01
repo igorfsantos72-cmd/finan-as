@@ -38,7 +38,7 @@ body{
   font-family:'Inter',sans-serif;
   font-size:14px;
   min-height:100vh;
-  padding-bottom:5rem; /* Espaço pro FAB */
+  padding-bottom:5rem; 
 }
 
 /* HEADER */
@@ -89,14 +89,6 @@ header{
   text-transform:uppercase;letter-spacing:.1em;
   margin-bottom:.75rem;
 }
-
-/* BUDGET CARD */
-.budget-info { display: flex; align-items: baseline; gap: 6px; margin-top: 12px; }
-.budget-spent { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing:-0.5px}
-.budget-limit { font-size: 12px; color: var(--text3); font-weight:500}
-.budget-msg {font-size: 10px; color: var(--text3); margin-top: 6px;}
-.edit-budget-btn { font-size: 10px; color: var(--accent); cursor: pointer; display: flex; align-items: center; gap:4px; font-weight:600; text-transform: none; letter-spacing:0}
-.edit-budget-btn:hover { color: var(--accent2); }
 
 /* SEARCH BAR */
 .search-bar {
@@ -250,7 +242,7 @@ header{
 .ctab{flex:1;padding:6px 4px;font-size:11px;font-weight:500;border-radius:20px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:'Inter',sans-serif;transition:all .15s;text-align:center}
 .ctab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-/* ACCORDION CATEGORIAS */
+/* ACCORDION CATEGORIAS (NESTED) */
 .cat-group{margin-bottom:8px;border:1px solid var(--border2);border-radius:var(--rm);background:var(--bg3);overflow:hidden;transition:all 0.2s}
 .cat-group:last-child{margin-bottom:0}
 .cat-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;user-select:none}
@@ -260,12 +252,21 @@ header{
 .cat-group.open .cat-body{max-height:2000px}
 .cat-group.open .cat-header{border-bottom:1px solid var(--border)}
 .cat-group.open .cat-arrow{transform:rotate(180deg)}
-.cat-item{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px}
-.cat-item:last-child{border-bottom:none}
+.cat-arrow{transition:transform 0.3s;width:14px;height:14px;color:var(--text3)}
+
+.cat-item-wrap{border-bottom:1px solid var(--border)}
+.cat-item-wrap:last-child{border-bottom:none}
+.cat-item{display:flex;justify-content:space-between;padding:10px 12px;font-size:11px;cursor:pointer;transition:background 0.2s; user-select:none;}
+.cat-item:hover{background:rgba(255,255,255,0.03)}
 .cat-item-name{color:var(--text2);display:flex;align-items:center;gap:6px}
 .cat-item-name::before{content:'';display:block;width:6px;height:6px;border-radius:50%;background:var(--accent)}
-.cat-item-val{font-weight:600;color:var(--text)}
-.cat-arrow{transition:transform 0.3s;width:14px;height:14px;color:var(--text3)}
+.cat-item-val{font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;}
+.cat-item-details{max-height:0;overflow:hidden;transition:max-height 0.3s ease;background:var(--bg)}
+.cat-item-wrap.open .cat-item-details{max-height:2000px}
+.cat-item-wrap.open .cat-sub-arrow{transform:rotate(180deg)}
+.sub-item{display:flex;justify-content:space-between;padding:8px 12px 8px 26px;font-size:10px;color:var(--text2);border-top:1px dashed var(--border2)}
+.sub-item-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;margin-right:10px}
+.cat-sub-arrow{width:12px;height:12px;color:var(--text3);transition:transform 0.3s;}
 
 /* BANK SECTION */
 .bank-section{margin-bottom:1.1rem}
@@ -302,26 +303,17 @@ header{
 
 <div class="wrap">
 
-  <!-- ORÇAMENTO -->
-  <div class="card" id="card-budget">
-    <div class="lbl" style="display:flex; justify-content:space-between">
-      <span>Orçamento do Período</span>
-      <span class="edit-budget-btn" onclick="editBudget()">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        Editar Meta
-      </span>
+  <!-- 1. GRÁFICO EM ROSQUINHA -->
+  <div class="card" id="card-donut">
+    <div class="lbl">Distribuição de Gastos</div>
+    <div class="chart-tabs">
+      <button class="ctab active" onclick="setChartTab('pessoa')">Por pessoa</button>
+      <button class="ctab" onclick="setChartTab('banco')">Por banco</button>
     </div>
-    <div class="budget-info">
-      <span id="budget-spent" class="budget-spent">R$ 0,00</span>
-      <span id="budget-limit" class="budget-limit">/ R$ 0,00</span>
-    </div>
-    <div class="bar-track" style="height:8px; margin-top:10px">
-      <div id="budget-fill" class="bar-fill" style="width: 0%; background: var(--green)"></div>
-    </div>
-    <div id="budget-msg" class="budget-msg">Calculando...</div>
+    <div id="donut-wrap" class="donut-wrap"></div>
   </div>
 
-  <!-- FILTROS -->
+  <!-- 2. FILTROS -->
   <div class="card">
     <div class="lbl">Filtros & Exportação</div>
     <div class="filter-row">
@@ -364,7 +356,7 @@ header{
     </div>
   </div>
 
-  <!-- HISTÓRICO -->
+  <!-- 3. HISTÓRICO -->
   <div class="card" id="card-history">
     <div class="hist-header">
       <div class="lbl" id="hist-label" style="margin-bottom:0;cursor:pointer" onclick="toggleHistory()">Histórico de compras</div>
@@ -373,8 +365,8 @@ header{
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><polyline points="9 11 12 14 22 4"/></svg>
           Selecionar
         </button>
-        <button class="hist-toggle open" id="hist-toggle-btn" onclick="toggleHistory()">
-          <span id="hist-toggle-txt">Minimizar</span>
+        <button class="hist-toggle" id="hist-toggle-btn" onclick="toggleHistory()">
+          <span id="hist-toggle-txt">Ver tudo</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
@@ -390,7 +382,7 @@ header{
       <button class="btn-cancel-sel" onclick="toggleSelectMode()">✕</button>
     </div>
     
-    <div id="history-wrap" class="open">
+    <div id="history-wrap" class="">
       <input type="text" id="search-input" class="search-bar" placeholder="Buscar compra pelo nome..." oninput="render()">
       <div id="history">
         <div class="empty-state">
@@ -401,29 +393,19 @@ header{
     </div>
   </div>
 
-  <!-- GRÁFICO EM ROSQUINHA -->
-  <div class="card" id="card-donut">
-    <div class="lbl">Distribuição de Gastos</div>
-    <div class="chart-tabs">
-      <button class="ctab active" onclick="setChartTab('pessoa')">Por pessoa</button>
-      <button class="ctab" onclick="setChartTab('banco')">Por banco</button>
-    </div>
-    <div id="donut-wrap" class="donut-wrap"></div>
-  </div>
-
-  <!-- GRÁFICO POR BANCO -->
+  <!-- 4. GRÁFICO POR BANCO -->
   <div class="card" id="card-bank">
     <div class="lbl">Gastos por banco</div>
     <div id="bank-bars"></div>
   </div>
 
-  <!-- GRÁFICO POR PESSOA -->
+  <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
     <div id="person-bars"></div>
   </div>
 
-  <!-- GRÁFICO BANCO/PESSOA -->
+  <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
   <div class="card" id="card-bank-person" style="display:none">
     <div class="lbl" id="bank-person-label">Gastos por banco</div>
     <div id="bank-person-bars"></div>
@@ -582,16 +564,39 @@ function renderPersonCategories(id, list) {
     const total = items.reduce((s,x)=>s+x.amount,0);
     const [bg, fg] = PC[person] || ['rgba(99,102,241,0.15)', '#6366f1'];
     const byCat = {};
+    
     items.forEach(e => {
       const c = getCategory(e.name);
-      if(!byCat[c]) byCat[c] = 0;
-      byCat[c] += e.amount;
+      if(!byCat[c]) byCat[c] = { total: 0, items: [] };
+      byCat[c].total += e.amount;
+      byCat[c].items.push(e);
     });
-    const catOrder = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+    
+    const catOrder = Object.entries(byCat).sort((a,b)=>b[1].total-a[1].total);
+    
     let catHtml = '';
-    catOrder.forEach(([cat, val]) => {
-      catHtml += `<div class="cat-item"><span class="cat-item-name">${cat}</span><span class="cat-item-val">${fmt(val)}</span></div>`;
+    catOrder.forEach(([cat, data], catIndex) => {
+      
+      let subHtml = data.items.sort((a,b)=>b.date.localeCompare(a.date)).map(e => `
+        <div class="sub-item">
+          <span class="sub-item-name">${fmtDate(e.date)} - ${e.name}</span>
+          <span style="font-weight:600; color:var(--text)">${fmt(e.amount)}</span>
+        </div>
+      `).join('');
+
+      catHtml += `
+      <div class="cat-item-wrap" id="ci-${index}-${catIndex}">
+        <div class="cat-item" onclick="document.getElementById('ci-${index}-${catIndex}').classList.toggle('open')">
+          <span class="cat-item-name">${cat} <span style="font-size:9px; opacity:0.5; margin-left:4px">(${data.items.length})</span></span>
+          <span class="cat-item-val">
+            ${fmt(data.total)}
+            <svg class="cat-sub-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </span>
+        </div>
+        <div class="cat-item-details">${subHtml}</div>
+      </div>`;
     });
+
     html += `
     <div class="cat-group" id="cg-${index}">
       <div class="cat-header" onclick="document.getElementById('cg-${index}').classList.toggle('open')">
@@ -709,7 +714,7 @@ function renderBars(id,data,type){
   }).join('');
 }
 
-let histOpen=true;
+let histOpen=false; // Inicia fechado conforme solicitado
 let selectMode=false;
 let selectedIds=new Set();
 
@@ -803,39 +808,11 @@ function renderItem(e){
   </div>`;
 }
 
-function updateBudget(spentTotal) {
-  let limit = parseFloat(localStorage.getItem('financas_budget')) || 3000;
-  let pct = Math.min((spentTotal / limit) * 100, 100);
-  
-  document.getElementById('budget-spent').textContent = fmt(spentTotal);
-  document.getElementById('budget-limit').textContent = '/ ' + fmt(limit);
-  
-  let fill = document.getElementById('budget-fill');
-  fill.style.width = pct + '%';
-  
-  let msg = document.getElementById('budget-msg');
-  if(pct < 50) { fill.style.background = 'var(--green)'; msg.textContent = 'Dentro da meta! Pode respirar fundo.'; msg.style.color = 'var(--green)';}
-  else if(pct < 85) { fill.style.background = 'var(--orange)'; msg.textContent = 'Atenção! Você já usou boa parte do orçamento.'; msg.style.color = 'var(--orange)';}
-  else { fill.style.background = 'var(--red)'; msg.textContent = 'Cuidado! Teto de gastos quase atingido ou estourado.'; msg.style.color = 'var(--red)';}
-}
-
-function editBudget() {
-  let current = localStorage.getItem('financas_budget') || 3000;
-  let res = prompt('Qual o limite ideal de gastos (R$) para o período?', current);
-  if(res && !isNaN(parseFloat(res.replace(',','.')))) {
-    localStorage.setItem('financas_budget', parseFloat(res.replace(',','.')));
-    showToast('Meta atualizada com sucesso!', 'success');
-    render();
-  }
-}
-
 function render(){
   const filtered=getFiltered();
   const from=document.getElementById('filter-from').value;
   const to=document.getElementById('filter-to').value;
-  
   const ft=filtered.reduce((s,e)=>s+e.amount,0);
-  updateBudget(ft);
 
   const fi=document.getElementById('finfo');
   const parts=[];
@@ -885,13 +862,15 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente\n";
+  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente
+";
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
+    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}
+`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
@@ -1110,10 +1089,7 @@ function removeEntry(id) {
 }
 
 ref.once('value', snap => {
-  if(!snap.exists()){
-    // Removi os PRELOADED deste snippet pra ficar mais leve e começar zerado pra você,
-    // mas se quiser seus dados de teste de volta, é só colar a array ali.
-  }
+  if(!snap.exists()){ }
 });
 
 ref.on('value', snap => {
