@@ -426,6 +426,7 @@ header{
     <div id="bank-person-bars"></div>
   </div>
 
+
   <!-- 6. METAS DE GASTOS -->
   <div class="card" id="card-metas">
     <div class="lbl">Metas de Gastos</div>
@@ -602,7 +603,7 @@ function startAudioRecognition() {
   
   recognition.onerror = function(event) {
     if(event.error === 'not-allowed') {
-      showToast('Permissão de microfone negada!', 'error');
+      showToast('Permissão de microfone negada! (Use HTTPS)', 'error');
     } else {
       showToast('Erro no áudio. Tente novamente.', 'error');
     }
@@ -811,7 +812,7 @@ function renderBars(id,data,type){
   }).join('');
 }
 
-let histOpen=false; 
+let histOpen=false; // Inicia fechado conforme solicitado
 let selectMode=false;
 let selectedIds=new Set();
 
@@ -914,108 +915,6 @@ function renderItem(e){
   </div>`;
 }
 
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  renderMetas();
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
-}
-
-function renderCharts(){
-  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
-  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
-  if(chartTab==='pessoa'){ 
-    const data=sumBy(filtered,'person',true); 
-    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
-    wrap.id='donut-wrap'; 
-    renderDonut('donut-wrap',data,colors);
-  } else { 
-    const data=sumBy(filtered,'bank',true); 
-    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); 
-    renderDonut('donut-wrap',data,colors); 
-  }
-}
-
 function render(){
   const filtered=getFiltered();
   const from=document.getElementById('filter-from').value;
@@ -1071,15 +970,16 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente\n";
+  const lines = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
+    lines.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
   });
-
+  
+  const csv = lines.join("\n");
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1228,6 +1128,109 @@ function renderDonut(containerId, data, colors){
   const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"> <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/> ${arcs} <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text> <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text> </svg>`;
   const legend=data.slice(0,8).map(([name,val],i)=>{ const pct=(val/total*100).toFixed(1); return`<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div><span class="legend-name" title="${name}">${name}</span><span class="legend-val">${fmt(val)}</span><span class="legend-pct">${pct}%</span></div>`; }).join('');
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
+}
+
+
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  renderMetas();
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e.person === person) {
+        const c = getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function renderCharts(){
+  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
+  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
+  if(chartTab==='pessoa'){ 
+    const data=sumBy(filtered,'person',true); 
+    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
+    wrap.id='donut-wrap'; 
+    renderDonut('donut-wrap',data,colors);
+  } else { 
+    const data=sumBy(filtered,'bank',true); 
+    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); 
+    renderDonut('donut-wrap',data,colors); 
+  }
 }
 
 function addEntry(){
