@@ -103,12 +103,13 @@ header{
 
 /* BOTTOM SHEET & FAB */
 .fab {
-  position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px;
-  border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: white; border: none; font-size: 28px; display: flex; align-items: center; justify-content: center;
+  position: fixed; bottom: 20px; width: 56px; height: 56px;
+  border-radius: 50%; color: white; border: none; font-size: 24px; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 4px 16px rgba(99,102,241,0.4); cursor: pointer; z-index: 1000;
   transition: transform 0.2s, opacity 0.2s;
 }
+.fab-right { right: 20px; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+.fab-left { left: 20px; background: linear-gradient(135deg, var(--blue), var(--accent)); }
 .fab:active { transform: scale(0.92); }
 .modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -153,7 +154,7 @@ header{
 .parcel-preview.show{ display:block }
 .parcel-preview strong{ color:var(--text) }
 
-/* HISTORY & SWIPE ITEMS */
+/* HISTORY & ITEMS */
 .hist-header{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; margin-bottom: 10px;}
 .hist-toggle{ display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500; color:var(--accent);background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:20px;padding:4px 10px;cursor:pointer; font-family:'Inter',sans-serif;transition:all .15s; }
 .hist-toggle:hover{background:rgba(99,102,241,0.18)}
@@ -320,9 +321,7 @@ header{
       <button class="ctab active" onclick="setChartTab('pessoa')">Por pessoa</button>
       <button class="ctab" onclick="setChartTab('banco')">Por banco</button>
     </div>
-    <div id="donut-wrap" class="donut-wrap">
-      <div class="empty-state">Carregando...</div>
-    </div>
+    <div id="donut-wrap" class="donut-wrap"></div>
   </div>
 
   <!-- 2. FILTROS -->
@@ -347,8 +346,8 @@ header{
       <button class="pchip" onclick="setPerson('NÓS')">NÓS</button>
       <button class="pchip" onclick="setPerson('PAIS IGOR')">PAIS IGOR</button>
       <button class="pchip" onclick="setPerson('IGOR')">IGOR</button>
-      <button class="pchip" onclick="setPerson('COMBUSTIVEL POLO')">COMBUSTIVEL POLO</button>
-      <button class="pchip" onclick="setPerson('CARONAS')">CARONAS</button>
+      
+      
     </div>
     <div class="section-divider"></div>
     <div class="chips-label" style="margin-bottom:.5rem">Por fatura</div>
@@ -399,7 +398,7 @@ header{
       <div id="history">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          <p>Carregando histórico...</p>
+          <p>Nenhuma compra registrada</p>
         </div>
       </div>
     </div>
@@ -408,17 +407,13 @@ header{
   <!-- 4. GRÁFICO POR BANCO -->
   <div class="card" id="card-bank">
     <div class="lbl">Gastos por banco</div>
-    <div id="bank-bars">
-      <div class="empty-state">Carregando...</div>
-    </div>
+    <div id="bank-bars"></div>
   </div>
 
   <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
-    <div id="person-bars">
-      <div class="empty-state">Carregando...</div>
-    </div>
+    <div id="person-bars"></div>
   </div>
 
   <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
@@ -426,6 +421,7 @@ header{
     <div class="lbl" id="bank-person-label">Gastos por banco</div>
     <div id="bank-person-bars"></div>
   </div>
+
 
   <!-- 6. METAS DE GASTOS -->
   <div class="card" id="card-metas">
@@ -449,6 +445,7 @@ header{
 </div>
 
 <!-- BOTTOM SHEET DE NOVA COMPRA -->
+
 <div class="modal-overlay" id="modal-overlay" onclick="closeSheet()"></div>
 <div class="bottom-sheet" id="sheet-nova-compra">
   <div class="sheet-drag"></div>
@@ -464,7 +461,7 @@ header{
       <label>Quem comprou</label>
       <select id="inp-person">
         <option value="">Selecione...</option>
-        <option>LE</option><option>PAIS LE</option><option>NÓS</option><option>PAIS IGOR</option><option>IGOR</option><option>COMBUSTIVEL POLO</option><option>CARONAS</option>
+        <option>LE</option><option>PAIS LE</option><option>NÓS</option><option>PAIS IGOR</option><option>IGOR</option>
       </select>
     </div>
     <div class="field">
@@ -506,8 +503,13 @@ header{
   </button>
 </div>
 
+<!-- FAB AUDIO BUTTON -->
+<button class="fab fab-left" onclick="startAudioRecognition()" title="Gravar Compra">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+</button>
+
 <!-- FAB BUTTON -->
-<button class="fab" onclick="openSheet()">
+<button class="fab fab-right" onclick="openSheet()">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
 </button>
 
@@ -523,8 +525,8 @@ const PC={
   'NÓS':['rgba(139,92,246,0.15)','#8b5cf6'],
   'PAIS IGOR':['rgba(245,158,11,0.15)','#f59e0b'],
   'IGOR':['rgba(239,68,68,0.15)','#ef4444'],
-  'COMBUSTIVEL POLO':['rgba(249,115,22,0.15)','#f97316'],
-  'CARONAS':['rgba(6,182,212,0.15)','#06b6d4']
+  
+  
 };
 const BANK_C=['#3b82f6','#10b981'];
 const BANKS=['C6','MERCADO PAGO'];
@@ -547,6 +549,62 @@ function getCategory(name) {
     if (keywords.some(k => lower.includes(k))) return cat;
   }
   return 'Outros';
+}
+
+
+// AUDIO RECOGNITION
+function startAudioRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('Seu navegador não suporta gravação de voz.', 'error');
+    return;
+  }
+  
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'pt-BR';
+  recognition.interimResults = false;
+  
+  recognition.onstart = function() {
+    showToast('Ouvindo... (Ex: 50 reais no Mercado)', 'info');
+  };
+  
+  recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript.toLowerCase();
+    
+    // Extrai os números falados (ex: 50.50 ou 50,50)
+    const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
+    let amount = "";
+    if (numMatch) {
+        amount = numMatch[0].replace(',', '.');
+    }
+    
+    // Limpa a frase para tirar o valor e as palavras de ligação
+    let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
+                         .replace(/ reais /g, '')
+                         .replace(/ centavos /g, '')
+                         .replace(/ e /g, '')
+                         .replace(/ no /g, '')
+                         .replace(/ na /g, '')
+                         .replace(/ o /g, '')
+                         .replace(/ a /g, '')
+                         .replace(/ em /g, '')
+                         .replace(/ com /g, '')
+                         .trim();
+    name = name.charAt(0).toUpperCase() + name.slice(1);
+    
+    // Abre a tela de cadastro e preenche os campos com o que o robô entendeu
+    openSheet();
+    if(amount) document.getElementById('inp-amount').value = parseFloat(amount).toFixed(2);
+    if(name) document.getElementById('inp-name').value = name;
+    
+    showToast('Áudio processado! Confira e salve.', 'success');
+  };
+  
+  recognition.onerror = function(event) {
+    showToast('Erro no áudio. Tente novamente.', 'error');
+  };
+  
+  recognition.start();
 }
 
 function showToast(msg, type='success') {
@@ -852,110 +910,6 @@ function renderItem(e){
   </div>`;
 }
 
-
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  renderMetas();
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
-}
-
-function renderCharts(){
-
-  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
-  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
-  if(chartTab==='pessoa'){ 
-    const data=sumBy(filtered,'person',true); 
-    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
-    wrap.id='donut-wrap'; 
-    renderDonut('donut-wrap',data,colors);
-  } else { 
-    const data=sumBy(filtered,'bank',true); 
-    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); 
-    renderDonut('donut-wrap',data,colors); 
-  }
-}
-
 function render(){
   const filtered=getFiltered();
   const from=document.getElementById('filter-from').value;
@@ -1011,13 +965,15 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente\n";
+  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente
+";
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
+    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}
+`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
@@ -1168,6 +1124,102 @@ function renderDonut(containerId, data, colors){
   const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"> <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/> ${arcs} <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text> <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text> </svg>`;
   const legend=data.slice(0,8).map(([name,val],i)=>{ const pct=(val/total*100).toFixed(1); return`<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div><span class="legend-name" title="${name}">${name}</span><span class="legend-val">${fmt(val)}</span><span class="legend-pct">${pct}%</span></div>`; }).join('');
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
+}
+
+
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  renderMetas();
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e.person === person) {
+        const c = getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function renderCharts(){
+
+  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
+  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
+  if(chartTab==='pessoa'){ const data=sumBy(filtered,'person',true); const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); wrap.id='donut-wrap'; renderDonut('donut-wrap',data,colors);
+  } else { const data=sumBy(filtered,'bank',true); const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); renderDonut('donut-wrap',data,colors); }
 }
 
 function addEntry(){
@@ -1338,22 +1390,9 @@ document.addEventListener('touchend', (e) => {
   swipeItem = null;
 });
 
-const PRELOADED=[
-  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90,paid:false},
-  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99,paid:false},
-  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00,paid:false},
-  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00,paid:false},
-  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00,paid:false},
-  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80,paid:false},
-  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99,paid:false}
-];
-
 ref.once('value', snap => {
-  if(!snap.exists()){ 
-    const b = {};
-    PRELOADED.forEach(e => { b[e.id] = e; });
-    ref.set(b);
-  }
+
+  if(!snap.exists()){ }
 });
 
 ref.on('value', snap => {
