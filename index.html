@@ -154,7 +154,7 @@ header{
 .parcel-preview.show{ display:block }
 .parcel-preview strong{ color:var(--text) }
 
-/* HISTORY & ITEMS */
+/* HISTORY & SWIPE ITEMS */
 .hist-header{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none; margin-bottom: 10px;}
 .hist-toggle{ display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500; color:var(--accent);background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); border-radius:20px;padding:4px 10px;cursor:pointer; font-family:'Inter',sans-serif;transition:all .15s; }
 .hist-toggle:hover{background:rgba(99,102,241,0.18)}
@@ -285,12 +285,12 @@ header{
 .empty-state{ text-align:center; padding:2rem 1rem; color:var(--text3); font-size:13px; display:flex; flex-direction:column; align-items:center; gap:12px; }
 .empty-state svg{ opacity:0.5; width:48px; height:48px; }
 
+/* METAS */
 .meta-item { display: flex; flex-direction: column; margin-bottom: 14px; }
 .meta-item:last-child { margin-bottom: 0; }
 .meta-input { background: rgba(255,255,255,0.05); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; padding: 4px 6px; width: 80px; text-align: right; outline: none; transition: border-color 0.2s;}
 .meta-input:focus { border-color: var(--accent); }
 </style>
-
 </head>
 <body>
 
@@ -321,7 +321,9 @@ header{
       <button class="ctab active" onclick="setChartTab('pessoa')">Por pessoa</button>
       <button class="ctab" onclick="setChartTab('banco')">Por banco</button>
     </div>
-    <div id="donut-wrap" class="donut-wrap"></div>
+    <div id="donut-wrap" class="donut-wrap">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- 2. FILTROS -->
@@ -346,8 +348,6 @@ header{
       <button class="pchip" onclick="setPerson('NÓS')">NÓS</button>
       <button class="pchip" onclick="setPerson('PAIS IGOR')">PAIS IGOR</button>
       <button class="pchip" onclick="setPerson('IGOR')">IGOR</button>
-      
-      
     </div>
     <div class="section-divider"></div>
     <div class="chips-label" style="margin-bottom:.5rem">Por fatura</div>
@@ -407,13 +407,17 @@ header{
   <!-- 4. GRÁFICO POR BANCO -->
   <div class="card" id="card-bank">
     <div class="lbl">Gastos por banco</div>
-    <div id="bank-bars"></div>
+    <div id="bank-bars">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
-    <div id="person-bars"></div>
+    <div id="person-bars">
+      <div class="empty-state">Carregando...</div>
+    </div>
   </div>
 
   <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
@@ -421,7 +425,6 @@ header{
     <div class="lbl" id="bank-person-label">Gastos por banco</div>
     <div id="bank-person-bars"></div>
   </div>
-
 
   <!-- 6. METAS DE GASTOS -->
   <div class="card" id="card-metas">
@@ -445,7 +448,6 @@ header{
 </div>
 
 <!-- BOTTOM SHEET DE NOVA COMPRA -->
-
 <div class="modal-overlay" id="modal-overlay" onclick="closeSheet()"></div>
 <div class="bottom-sheet" id="sheet-nova-compra">
   <div class="sheet-drag"></div>
@@ -524,9 +526,7 @@ const PC={
   'PAIS LE':['rgba(16,185,129,0.15)','#10b981'],
   'NÓS':['rgba(139,92,246,0.15)','#8b5cf6'],
   'PAIS IGOR':['rgba(245,158,11,0.15)','#f59e0b'],
-  'IGOR':['rgba(239,68,68,0.15)','#ef4444'],
-  
-  
+  'IGOR':['rgba(239,68,68,0.15)','#ef4444']
 };
 const BANK_C=['#3b82f6','#10b981'];
 const BANKS=['C6','MERCADO PAGO'];
@@ -544,13 +544,13 @@ const CATEGORIES = {
 };
 
 function getCategory(name) {
+  if (!name) return 'Outros';
   const lower = name.toLowerCase();
   for (const [cat, keywords] of Object.entries(CATEGORIES)) {
     if (keywords.some(k => lower.includes(k))) return cat;
   }
   return 'Outros';
 }
-
 
 // AUDIO RECOGNITION
 function startAudioRecognition() {
@@ -580,15 +580,15 @@ function startAudioRecognition() {
     
     // Limpa a frase para tirar o valor e as palavras de ligação
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
-                         .replace(/ reais /g, '')
-                         .replace(/ centavos /g, '')
-                         .replace(/ e /g, '')
-                         .replace(/ no /g, '')
-                         .replace(/ na /g, '')
-                         .replace(/ o /g, '')
-                         .replace(/ a /g, '')
-                         .replace(/ em /g, '')
-                         .replace(/ com /g, '')
+                         .replace(/\breais\b/gi, '')
+                         .replace(/\bcentavos\b/gi, '')
+                         .replace(/\be\b/gi, '')
+                         .replace(/\bno\b/gi, '')
+                         .replace(/\bna\b/gi, '')
+                         .replace(/\bo\b/gi, '')
+                         .replace(/\ba\b/gi, '')
+                         .replace(/\bem\b/gi, '')
+                         .replace(/\bcom\b/gi, '')
                          .trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
     
@@ -601,7 +601,11 @@ function startAudioRecognition() {
   };
   
   recognition.onerror = function(event) {
-    showToast('Erro no áudio. Tente novamente.', 'error');
+    if(event.error === 'not-allowed') {
+      showToast('Permissão de microfone negada!', 'error');
+    } else {
+      showToast('Erro no áudio. Tente novamente.', 'error');
+    }
   };
   
   recognition.start();
@@ -807,7 +811,7 @@ function renderBars(id,data,type){
   }).join('');
 }
 
-let histOpen=false; // Inicia fechado conforme solicitado
+let histOpen=false; 
 let selectMode=false;
 let selectedIds=new Set();
 
@@ -910,6 +914,108 @@ function renderItem(e){
   </div>`;
 }
 
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  renderMetas();
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e.person === person) {
+        const c = getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function renderCharts(){
+  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
+  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
+  if(chartTab==='pessoa'){ 
+    const data=sumBy(filtered,'person',true); 
+    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
+    wrap.id='donut-wrap'; 
+    renderDonut('donut-wrap',data,colors);
+  } else { 
+    const data=sumBy(filtered,'bank',true); 
+    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); 
+    renderDonut('donut-wrap',data,colors); 
+  }
+}
+
 function render(){
   const filtered=getFiltered();
   const from=document.getElementById('filter-from').value;
@@ -965,15 +1071,13 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente
-";
+  let csv = "Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente\n";
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}
-`;
+    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
@@ -1124,102 +1228,6 @@ function renderDonut(containerId, data, colors){
   const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"> <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/> ${arcs} <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text> <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text> </svg>`;
   const legend=data.slice(0,8).map(([name,val],i)=>{ const pct=(val/total*100).toFixed(1); return`<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div><span class="legend-name" title="${name}">${name}</span><span class="legend-val">${fmt(val)}</span><span class="legend-pct">${pct}%</span></div>`; }).join('');
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
-}
-
-
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  renderMetas();
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
-}
-
-function renderCharts(){
-
-  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
-  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
-  if(chartTab==='pessoa'){ const data=sumBy(filtered,'person',true); const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); wrap.id='donut-wrap'; renderDonut('donut-wrap',data,colors);
-  } else { const data=sumBy(filtered,'bank',true); const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); renderDonut('donut-wrap',data,colors); }
 }
 
 function addEntry(){
@@ -1390,9 +1398,22 @@ document.addEventListener('touchend', (e) => {
   swipeItem = null;
 });
 
-ref.once('value', snap => {
+const PRELOADED=[
+  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90,paid:false},
+  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99,paid:false},
+  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00,paid:false},
+  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00,paid:false},
+  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00,paid:false},
+  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80,paid:false},
+  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99,paid:false}
+];
 
-  if(!snap.exists()){ }
+ref.once('value', snap => {
+  if(!snap.exists()){ 
+    const b = {};
+    PRELOADED.forEach(e => { b[e.id] = e; });
+    ref.set(b);
+  }
 });
 
 ref.on('value', snap => {
