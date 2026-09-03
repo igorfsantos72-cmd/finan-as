@@ -246,7 +246,7 @@ header{
 .ctab{flex:1;padding:6px 4px;font-size:11px;font-weight:500;border-radius:20px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:'Inter',sans-serif;transition:all .15s;text-align:center}
 .ctab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
-/* ACCORDION CATEGORIAS */
+/* ACCORDION CATEGORIAS (NESTED) */
 .cat-group{margin-bottom:8px;border:1px solid var(--border2);border-radius:var(--rm);background:var(--bg3);overflow:hidden;transition:all 0.2s}
 .cat-group:last-child{margin-bottom:0}
 .cat-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;user-select:none}
@@ -257,6 +257,7 @@ header{
 .cat-group.open .cat-header{border-bottom:1px solid var(--border)}
 .cat-group.open .cat-arrow{transform:rotate(180deg)}
 .cat-arrow{transition:transform 0.3s;width:14px;height:14px;color:var(--text3)}
+
 .cat-item-wrap{border-bottom:1px solid var(--border)}
 .cat-item-wrap:last-child{border-bottom:none}
 .cat-item{display:flex;justify-content:space-between;padding:10px 12px;font-size:11px;cursor:pointer;transition:background 0.2s; user-select:none;}
@@ -282,7 +283,13 @@ header{
 /* EMPTY STATE ILLUSTRATED */
 .empty-state{ text-align:center; padding:2rem 1rem; color:var(--text3); font-size:13px; display:flex; flex-direction:column; align-items:center; gap:12px; }
 .empty-state svg{ opacity:0.5; width:48px; height:48px; }
+
+.meta-item { display: flex; flex-direction: column; margin-bottom: 14px; }
+.meta-item:last-child { margin-bottom: 0; }
+.meta-input { background: rgba(255,255,255,0.05); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; padding: 4px 6px; width: 80px; text-align: right; outline: none; transition: border-color 0.2s;}
+.meta-input:focus { border-color: var(--accent); }
 </style>
+
 </head>
 <body>
 
@@ -420,6 +427,25 @@ header{
     <div id="bank-person-bars"></div>
   </div>
 
+  <!-- 6. METAS DE GASTOS -->
+  <div class="card" id="card-metas">
+    <div class="lbl">Metas de Gastos</div>
+    <div id="metas-list">
+      <div class="empty-state">Carregando metas...</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ALERT META OVERLAY -->
+<div class="modal-overlay" id="meta-alert-overlay" style="z-index: 2000;" onclick="closeMetaAlert()"></div>
+<div class="bottom-sheet" id="meta-alert" style="z-index: 2001; background: var(--red); color: #fff; text-align:center;">
+   <div class="sheet-drag" style="background: rgba(255,255,255,0.5)"></div>
+   <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+   <h2 style="margin-bottom: 10px; font-weight:700; color: #fff;">Meta Estrapolada!</h2>
+   <p id="meta-alert-text" style="font-size: 14px; opacity: 0.9; margin-bottom: 24px; line-height: 1.5;"></p>
+   <button onclick="closeMetaAlert()" style="background: rgba(0,0,0,0.25); border:none; color:#fff; padding: 14px 24px; border-radius: var(--rm); font-weight: 600; width: 100%; font-size: 14px; cursor:pointer;">Entendi</button>
 </div>
 
 <!-- BOTTOM SHEET DE NOVA COMPRA -->
@@ -826,6 +852,110 @@ function renderItem(e){
   </div>`;
 }
 
+
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  renderMetas();
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e.person === person) {
+        const c = getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+function renderCharts(){
+
+  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
+  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
+  if(chartTab==='pessoa'){ 
+    const data=sumBy(filtered,'person',true); 
+    const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
+    wrap.id='donut-wrap'; 
+    renderDonut('donut-wrap',data,colors);
+  } else { 
+    const data=sumBy(filtered,'bank',true); 
+    const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); 
+    renderDonut('donut-wrap',data,colors); 
+  }
+}
+
 function render(){
   const filtered=getFiltered();
   const from=document.getElementById('filter-from').value;
@@ -874,6 +1004,7 @@ function render(){
     hist.innerHTML=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
   }
   try{renderCharts();}catch(e){console.warn('Chart error:',e);}
+  renderMetas();
 }
 
 function gerarCSV() {
@@ -886,7 +1017,7 @@ function gerarCSV() {
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    csv += e.date + ',"' + nameStr + '",' + e.person + ',' + e.bank + ',"' + valorStr + '",' + statusStr + ',' + fixoStr + '\n';
+    csv += `${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}\n`;
   });
 
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
@@ -1039,13 +1170,6 @@ function renderDonut(containerId, data, colors){
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
 }
 
-function renderCharts(){
-  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
-  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
-  if(chartTab==='pessoa'){ const data=sumBy(filtered,'person',false); const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); wrap.id='donut-wrap'; renderDonut('donut-wrap',data,colors);
-  } else { const data=sumBy(filtered,'bank',false); const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); renderDonut('donut-wrap',data,colors); }
-}
-
 function addEntry(){
   const date = document.getElementById('inp-date').value;
   const name = document.getElementById('inp-name').value.trim();
@@ -1057,6 +1181,16 @@ function addEntry(){
   if(!date || !name || !person || !bank || isNaN(amount) || amount <= 0){
     showToast('Preencha todos os campos corretamente!', 'error');
     return;
+  }
+
+  const cat = getCategory(name);
+  const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+  if (limit > 0) {
+    const filtered = getFiltered();
+    const spent = filtered.filter(e => e.person === person && getCategory(e.name) === cat).reduce((s, e) => s + e.amount, 0);
+    if ((spent + amount) > limit) {
+       showMetaAlert(person, cat, limit, spent, amount);
+    }
   }
 
   const isParcel = document.getElementById('chk-parcel').checked;
