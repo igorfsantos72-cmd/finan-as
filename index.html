@@ -449,7 +449,7 @@ header{
     </div>
   </div>
 
-  <!-- GRÁFICO BANCO/PESSOA -->
+  <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
   <div class="card" id="card-bank-person" style="display:none">
     <div class="lbl" id="bank-person-label">Gastos por banco</div>
     <div id="bank-person-bars"></div>
@@ -551,6 +551,12 @@ header{
     <button class="cap-close" onclick="closeCapital()">✕</button>
   </div>
   <div class="cap-body">
+    
+    <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom: 0.5rem;">
+      <label for="cap-month" style="color:var(--text2); font-weight:600; font-size:12px;">Mês de Referência:</label>
+      <input type="month" id="cap-month" class="cap-input" style="width:auto; text-align:center; font-weight:700; font-size:14px; padding:6px 10px;" onchange="loadCapitalMonth(this.value)">
+    </div>
+
     <div class="cap-total-card">
       <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; opacity:0.8">Renda Total do Mês</div>
       <input type="number" id="cap-renda" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()">
@@ -582,7 +588,7 @@ header{
   <div class="cap-footer">
     <button class="btn-add" style="margin-top:0" onclick="saveCapital()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Salvar Distribuição
+      Salvar Distribuição Mensal
     </button>
   </div>
 </div>
@@ -643,14 +649,14 @@ function startAudioRecognition() {
   recognition.onresult = function(event) {
     const transcript = event.results[0][0].transcript.toLowerCase();
     
-    // Extrai os números
+    // Extrai os números falados (ex: 50.50 ou 50,50)
     const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
     let amount = "";
     if (numMatch) {
         amount = numMatch[0].replace(',', '.');
     }
     
-    // Limpa a frase
+    // Limpa a frase para tirar o valor e as palavras de ligação
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
                          .replace(/\breais\b/gi, '')
                          .replace(/\bcentavos\b/gi, '')
@@ -664,6 +670,7 @@ function startAudioRecognition() {
                          .trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
     
+    // Abre a tela de cadastro e preenche os campos com o que o robô entendeu
     openSheet();
     if(amount) document.getElementById('inp-amount').value = parseFloat(amount).toFixed(2);
     if(name) document.getElementById('inp-name').value = name;
@@ -1040,16 +1047,16 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  const lines = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
+  let rows = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
     let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    lines.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
+    rows.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
   });
-  
-  const csv = lines.join("\n");
+
+  const csv = rows.join("\r\n");
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1198,102 +1205,6 @@ function renderDonut(containerId, data, colors){
   const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"> <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/> ${arcs} <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text> <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text> </svg>`;
   const legend=data.slice(0,8).map(([name,val],i)=>{ const pct=(val/total*100).toFixed(1); return`<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div><span class="legend-name" title="${name}">${name}</span><span class="legend-val">${fmt(val)}</span><span class="legend-pct">${pct}%</span></div>`; }).join('');
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
-}
-
-
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  renderMetas();
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
-}
-
-function renderCharts(){
-
-  const filtered=getFiltered(); const wrap=document.getElementById('donut-wrap');
-  if(!filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
-  if(chartTab==='pessoa'){ const data=sumBy(filtered,'person',true); const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); wrap.id='donut-wrap'; renderDonut('donut-wrap',data,colors);
-  } else { const data=sumBy(filtered,'bank',true); const colors=data.map(([name])=>BANK_C[BANKS.indexOf(name)]||'#6366f1'); renderDonut('donut-wrap',data,colors); }
 }
 
 function addEntry(){
@@ -1492,29 +1403,41 @@ ref.on('value', snap => {
 document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
 buildInvoiceChips();
 
-// GESTÃO DE CAPITAL
-let capitalData = { renda: 0, fixos: 0, invest: 0, viagem: 0, compras: 0, lazer: 0, reserva: 0 };
-const refCapital = db.ref('capital');
-
-refCapital.on('value', snap => {
-  if(snap.exists()){
-    capitalData = snap.val();
-  }
-});
+// GESTÃO DE CAPITAL MENSUAL
+let currentCapMonth = '';
+let capRef = null;
 
 function openCapital() {
   document.getElementById('capital-view').classList.add('show');
   document.body.style.overflow = 'hidden';
   
-  document.getElementById('cap-renda').value = capitalData.renda || '';
-  document.getElementById('cap-fixos').value = capitalData.fixos || '';
-  document.getElementById('cap-invest').value = capitalData.invest || '';
-  document.getElementById('cap-viagem').value = capitalData.viagem || '';
-  document.getElementById('cap-compras').value = capitalData.compras || '';
-  document.getElementById('cap-lazer').value = capitalData.lazer || '';
-  document.getElementById('cap-reserva').value = capitalData.reserva || '';
+  if(!currentCapMonth) {
+    const today = new Date();
+    currentCapMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  }
+  document.getElementById('cap-month').value = currentCapMonth;
+  loadCapitalMonth(currentCapMonth);
+}
+
+function loadCapitalMonth(monthStr) {
+  if(!monthStr) return;
+  currentCapMonth = monthStr;
+  if(capRef) capRef.off();
   
-  calcCapital();
+  capRef = db.ref('capital/' + currentCapMonth);
+  capRef.on('value', snap => {
+    const data = snap.exists() ? snap.val() : { renda: 0, fixos: 0, invest: 0, viagem: 0, compras: 0, lazer: 0, reserva: 0 };
+    
+    document.getElementById('cap-renda').value = data.renda || '';
+    document.getElementById('cap-fixos').value = data.fixos || '';
+    document.getElementById('cap-invest').value = data.invest || '';
+    document.getElementById('cap-viagem').value = data.viagem || '';
+    document.getElementById('cap-compras').value = data.compras || '';
+    document.getElementById('cap-lazer').value = data.lazer || '';
+    document.getElementById('cap-reserva').value = data.reserva || '';
+    
+    calcCapital();
+  });
 }
 
 function closeCapital() {
@@ -1577,9 +1500,10 @@ function saveCapital() {
     reserva: parseFloat(document.getElementById('cap-reserva').value) || 0
   };
   
-  refCapital.set(newData, err => {
+  if(!currentCapMonth) return;
+  db.ref('capital/' + currentCapMonth).set(newData, err => {
     if(!err) {
-      showToast('Capital distribuído e salvo!', 'success');
+      showToast('Capital de ' + currentCapMonth + ' salvo!', 'success');
       closeCapital();
     } else {
       showToast('Erro ao salvar.', 'error');
