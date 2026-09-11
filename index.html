@@ -291,8 +291,6 @@ header{
 /* METAS */
 .meta-item { display: flex; flex-direction: column; margin-bottom: 14px; }
 .meta-item:last-child { margin-bottom: 0; }
-.meta-input { background: rgba(255,255,255,0.05); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; padding: 4px 6px; width: 80px; text-align: right; outline: none; transition: border-color 0.2s;}
-.meta-input:focus { border-color: var(--accent); }
 
 /* CAPITAL VIEW */
 .capital-view { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 9999; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); overflow-y: auto; padding-bottom: 80px; }
@@ -305,11 +303,15 @@ header{
 .cap-total-card input { background: transparent; border: none; border-bottom: 2px solid rgba(255,255,255,0.5); color: #fff; font-size: 32px; font-weight: 700; text-align: center; width: 100%; outline: none; margin-top: 10px; font-family: 'Inter', sans-serif;}
 .cap-total-card input::placeholder { color: rgba(255,255,255,0.5); }
 .cap-summary { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem 1rem; }
+.cap-footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); padding: 1rem; border-top: 1px solid var(--border); z-index: 10; }
+
 .cap-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; font-weight: 500; color: var(--text); }
 .cap-row:last-child { margin-bottom: 0; }
-.cap-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--rm); color: var(--text); padding: 8px 12px; width: 110px; text-align: right; outline: none; font-family: 'Inter', sans-serif; transition: border-color 0.2s;}
-.cap-input:focus { border-color: var(--accent); }
-.cap-footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); padding: 1rem; border-top: 1px solid var(--border); z-index: 10; }
+.cap-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--rm); color: var(--text); padding: 8px 12px; width: 100px; text-align: right; outline: none; font-family: 'Inter', sans-serif; transition: border-color 0.2s;}
+.cap-name-input { background:transparent; border:none; color:var(--text); font-family:'Inter',sans-serif; font-size:13px; font-weight:500; width:100%; outline:none; border-bottom:1px dashed transparent; transition:border-color 0.2s; padding: 4px 0;}
+.cap-name-input:focus { border-bottom-color:var(--accent); }
+.cap-del-btn { color:var(--text3); background:none; border:none; cursor:pointer; margin-left:8px; font-size:14px; padding: 4px;}
+.cap-del-btn:hover { color:var(--red); }
 </style>
 </head>
 <body>
@@ -444,7 +446,7 @@ header{
     </div>
   </div>
 
-  <!-- 5. GRÁFICO POR PESSOA -->
+  <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
     <div id="person-bars">
@@ -452,7 +454,7 @@ header{
     </div>
   </div>
 
-  <!-- GRÁFICO BANCO/PESSOA -->
+  <!-- GRÁFICO BANCO/PESSOA (Apenas usado quando filtrado) -->
   <div class="card" id="card-bank-person" style="display:none">
     <div class="lbl" id="bank-person-label">Gastos por banco</div>
     <div id="bank-person-bars"></div>
@@ -566,14 +568,12 @@ header{
     </div>
     
     <div class="cap-summary">
-      <div class="lbl" style="margin-bottom: 1.2rem; color:var(--accent2)">Distribuição de Renda</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1.2rem;">
+        <div class="lbl" style="color:var(--accent2); margin-bottom:0">Distribuição de Renda</div>
+        <button onclick="addCapCategory()" style="background:none; border:none; color:var(--accent); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;">+ Adicionar</button>
+      </div>
       
-      <div class="cap-row"><span>🏠 Custos Fixos</span><input type="number" class="cap-input" id="cap-fixos" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
-      <div class="cap-row"><span>📈 Investimentos</span><input type="number" class="cap-input" id="cap-invest" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
-      <div class="cap-row"><span>✈️ Viagens / Projetos</span><input type="number" class="cap-input" id="cap-viagem" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
-      <div class="cap-row"><span>🛍️ Compras Livres</span><input type="number" class="cap-input" id="cap-compras" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
-      <div class="cap-row"><span>🍻 Lazer / Saídas</span><input type="number" class="cap-input" id="cap-lazer" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
-      <div class="cap-row"><span>🛡️ Reserva Emergência</span><input type="number" class="cap-input" id="cap-reserva" placeholder="0,00" step="0.01" inputmode="decimal" oninput="calcCapital()"></div>
+      <div id="cap-dynamic-rows"></div>
     </div>
 
     <div class="cap-summary" style="margin-bottom: 3rem;">
@@ -725,7 +725,7 @@ function startAudioRecognition() {
   
   recognition.onerror = function(event) {
     if(event.error === 'not-allowed') {
-      showToast('Permissão de microfone negada! (Use HTTPS)', 'error');
+      showToast('Permissão negada! Lembre-se de rodar o site em HTTPS.', 'error');
     } else {
       showToast('Erro no áudio. Tente novamente.', 'error');
     }
@@ -762,15 +762,17 @@ function addEntry(){
   }
 
   // ALERTA DE METAS
-  const cat = getCategory(name);
-  const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-  if (limit > 0) {
-    const filtered = getFiltered();
-    const spent = filtered.filter(e => e && e.person === person && getCategory(e.name) === cat).reduce((s, e) => s + (Number(e.amount)||0), 0);
-    if ((spent + amount) > limit) {
-       showMetaAlert(person, cat, limit, spent, amount);
+  try {
+    const cat = getCategory(name);
+    const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+    if (limit > 0) {
+      const filtered = getFiltered();
+      const spent = filtered.filter(e => e && e.person === person && getCategory(e.name) === cat).reduce((s, e) => s + (Number(e.amount)||0), 0);
+      if ((spent + amount) > limit) {
+         showMetaAlert(person, cat, limit, spent, amount);
+      }
     }
-  }
+  } catch(e) { console.error('Erro na meta:', e); }
 
   const isParcel = document.getElementById('chk-parcel').checked;
   const totalParcelas = parseInt(document.getElementById('inp-parcelas').value) || 0;
@@ -904,6 +906,7 @@ function clearFilter(){
   render();
 }
 
+
 // =============== RENDERIZAÇÃO CENTRAL ===============
 function sumBy(list,key,onlyUnpaid=false){
   const map={};
@@ -951,7 +954,7 @@ function renderCharts(filtered){
   const wrap=document.getElementById('donut-wrap');
   if(!filtered || !filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
   
-  // FALSE: Garante que TODAS as compras apareçam no gráfico de pizza (pagas ou não).
+  // FALSE: Garante que TODAS as compras apareçam no gráfico de pizza.
   if(chartTab==='pessoa'){ 
     const data=sumBy(filtered,'person',false); 
     const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
@@ -980,6 +983,111 @@ function renderBars(id,data,type){
     }
     return`<div class="bar-row"><span class="bar-name" title="${name}">${name}</span><div class="bar-track"><div class="bar-fill" style="width:${(val/max*100).toFixed(1)}%;background:${c}"></div></div><span class="bar-val">${fmt(val)}</span></div>`;
   }).join('');
+}
+
+let histOpen=false; 
+let selectMode=false;
+let selectedIds=new Set();
+
+function toggleSelectMode(){
+  selectMode=!selectMode;
+  selectedIds.clear();
+  const bar=document.getElementById('select-bar');
+  const btn=document.getElementById('btn-select-mode');
+  bar.classList.toggle('show',selectMode);
+  btn.style.color=selectMode?'var(--accent)':'';
+  if(selectMode&&!histOpen)toggleHistory();
+  updateSelectBar();
+  render();
+}
+
+function toggleSelect(id){
+  if(selectedIds.has(id))selectedIds.delete(id);
+  else selectedIds.add(id);
+  const chk=document.getElementById('chk-'+id);
+  if(chk)chk.className='item-checkbox'+(selectedIds.has(id)?' checked':'');
+  updateSelectBar();
+}
+
+function selectAll(){
+  const filtered=getFiltered();
+  if(selectedIds.size===filtered.length){selectedIds.clear();}
+  else{filtered.forEach(e=>selectedIds.add(e.id));}
+  updateSelectBar();
+  render();
+}
+
+function updateSelectBar(){
+  const txt=document.getElementById('select-count');
+  if(txt)txt.textContent=`${selectedIds.size} selecionada${selectedIds.size!==1?'s':''}`;
+}
+
+function deleteSelected(){
+  if(!selectedIds.size)return;
+  if(!confirm(`Excluir ${selectedIds.size} compra${selectedIds.size!==1?'s':''}?`))return;
+  const updates={};
+  selectedIds.forEach(id=>{updates[id]=null;});
+  ref.update(updates,()=>{
+    showToast(`${selectedIds.size} compras excluídas!`, 'success');
+    selectedIds.clear();
+    selectMode=false;
+    document.getElementById('select-bar').classList.remove('show');
+    document.getElementById('btn-select-mode').style.color='';
+    render();
+  });
+}
+
+function toggleHistory(){
+  histOpen=!histOpen;
+  const wrap=document.getElementById('history-wrap');
+  const btn=document.getElementById('hist-toggle-btn');
+  const txt=document.getElementById('hist-toggle-txt');
+  wrap.classList.toggle('open',histOpen);
+  btn.classList.toggle('open',histOpen);
+  txt.textContent=histOpen?'Minimizar':'Ver tudo';
+}
+
+function togglePaid(id){
+  const entry=entries.find(e=>e.id===id);
+  if(!entry)return;
+  ref.child(id).update({paid:!entry.paid});
+}
+
+function renderItem(e){
+  if(!e) return '';
+  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
+  const paidClass=e.paid?'paid-item':'';
+  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
+  const checked=selectedIds.has(e.id)?'checked':'';
+  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
+  const paidBtnTxt=e.paid
+    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
+    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
+  
+  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
+  const itemName = e.name || 'Nova Compra';
+
+  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
+    ${selectMode ? '' : `
+    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
+      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
+      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
+    </div>`}
+    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
+      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
+      <div class="item-main">
+        <div class="item-name">${itemName} ${recBadge}</div>
+        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
+        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
+      </div>
+      <div class="item-right">
+        <div class="item-amount">${fmt(e.amount)}</div>
+        <div class="item-date">${fmtDate(e.date)}</div>
+      </div>
+      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
+    </div>
+  </div>`;
 }
 
 function renderPersonCategories(id, list) {
@@ -1043,44 +1151,6 @@ function renderPersonCategories(id, list) {
   });
   el.innerHTML = html;
 }
-
-function renderItem(e){
-  if(!e) return '';
-  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
-  const paidClass=e.paid?'paid-item':'';
-  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
-  const checked=selectedIds.has(e.id)?'checked':'';
-  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
-  const paidBtnTxt=e.paid
-    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
-    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
-  
-  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
-  const itemName = e.name || 'Nova Compra';
-
-  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
-    ${selectMode ? '' : `
-    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
-      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
-      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
-    </div>`}
-    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
-      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
-      <div class="item-main">
-        <div class="item-name">${itemName} ${recBadge}</div>
-        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
-        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
-      </div>
-      <div class="item-right">
-        <div class="item-amount">${fmt(e.amount)}</div>
-        <div class="item-date">${fmtDate(e.date)}</div>
-      </div>
-      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
-    </div>
-  </div>`;
-}
-
 
 function render(){
   const filtered=getFiltered();
@@ -1301,6 +1371,7 @@ function updateParcelPreview(){
   preview.classList.add('show'); preview.innerHTML=`Serão criadas <strong>${remaining}</strong> parcela${remaining!==1?'s':''} de ${firstName} (${atual}/${total} até ${total}/${total})<br>Da data <strong>${fmtDate(date)}</strong> até <strong>${fmtDate(lastDate)}</strong>`;
 }
 
+
 // =============== LÓGICA DO SWIPE (ARRASTAR) ===============
 let startX = 0, startY = 0, currentX = 0, isDragging = false, swipeItem = null, isHorizontal = false, firstMove = true;
 
@@ -1380,6 +1451,20 @@ buildInvoiceChips();
 // =============== GESTÃO DE CAPITAL MENSUAL ===============
 let currentCapMonth = '';
 let capRef = null;
+let capAllocs = [];
+
+const DEFAULT_CAP_CATS = [
+  { id: 'c1', name: '🏠 Custos Fixos', val: 0 },
+  { id: 'c2', name: '📈 Investimentos', val: 0 },
+  { id: 'c3', name: '✈️ Viagens / Projetos', val: 0 },
+  { id: 'c4', name: '🛍️ Compras Livres', val: 0 },
+  { id: 'c5', name: '🍻 Lazer / Saídas', val: 0 },
+  { id: 'c6', name: '🛡️ Reserva Emergência', val: 0 }
+];
+
+function generateId() {
+  return Math.random().toString(36).substr(2, 9);
+}
 
 function loadCapitalMonth(monthStr) {
   if(!monthStr) return;
@@ -1388,24 +1473,75 @@ function loadCapitalMonth(monthStr) {
   
   capRef = db.ref('capital/' + currentCapMonth);
   capRef.on('value', snap => {
-    const data = snap.exists() ? snap.val() : { renda: 0, fixos: 0, invest: 0, viagem: 0, compras: 0, lazer: 0, reserva: 0 };
-    
-    document.getElementById('cap-renda').value = data.renda || '';
-    document.getElementById('cap-fixos').value = data.fixos || '';
-    document.getElementById('cap-invest').value = data.invest || '';
-    document.getElementById('cap-viagem').value = data.viagem || '';
-    document.getElementById('cap-compras').value = data.compras || '';
-    document.getElementById('cap-lazer').value = data.lazer || '';
-    document.getElementById('cap-reserva').value = data.reserva || '';
-    
+    const data = snap.exists() ? snap.val() : null;
+    if(data) {
+      document.getElementById('cap-renda').value = data.renda || '';
+      if(data.allocs) {
+        capAllocs = Object.values(data.allocs);
+      } else {
+        // Migração de dados antigos
+        capAllocs = [
+          { id: generateId(), name: '🏠 Custos Fixos', val: data.fixos || 0 },
+          { id: generateId(), name: '📈 Investimentos', val: data.invest || 0 },
+          { id: generateId(), name: '✈️ Viagens / Projetos', val: data.viagem || 0 },
+          { id: generateId(), name: '🛍️ Compras Livres', val: data.compras || 0 },
+          { id: generateId(), name: '🍻 Lazer / Saídas', val: data.lazer || 0 },
+          { id: generateId(), name: '🛡️ Reserva Emergência', val: data.reserva || 0 }
+        ];
+      }
+    } else {
+      document.getElementById('cap-renda').value = '';
+      capAllocs = JSON.parse(JSON.stringify(DEFAULT_CAP_CATS));
+    }
+    renderCapRows();
     calcCapital();
   });
+}
+
+function renderCapRows() {
+  const container = document.getElementById('cap-dynamic-rows');
+  container.innerHTML = capAllocs.map(cat => `
+    <div class="cap-row" id="row-${cat.id}">
+      <div style="flex:1; display:flex; align-items:center; margin-right: 10px;">
+        <input type="text" class="cap-name-input" value="${cat.name}" placeholder="Nome da Categoria" onchange="updateCapName('${cat.id}', this.value)">
+      </div>
+      <div style="display:flex; align-items:center;">
+        <input type="number" class="cap-input" value="${cat.val || ''}" placeholder="0,00" step="0.01" inputmode="decimal" oninput="updateCapVal('${cat.id}', this.value); calcCapital();">
+        <button class="cap-del-btn" onclick="removeCapCategory('${cat.id}')">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addCapCategory() {
+  capAllocs.push({ id: generateId(), name: '', val: 0 });
+  renderCapRows();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.cap-name-input');
+    if(inputs.length > 0) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeCapCategory(id) {
+  if(!confirm('Remover esta categoria do capital?')) return;
+  capAllocs = capAllocs.filter(c => c.id !== id);
+  renderCapRows();
+  calcCapital();
+}
+
+function updateCapName(id, name) {
+  const cat = capAllocs.find(c => c.id === id);
+  if(cat) cat.name = name;
+}
+
+function updateCapVal(id, val) {
+  const cat = capAllocs.find(c => c.id === id);
+  if(cat) cat.val = parseFloat(val) || 0;
 }
 
 function openCapital() {
   document.getElementById('capital-view').classList.add('show');
   document.body.style.overflow = 'hidden';
-  
   if(!currentCapMonth) {
     const today = new Date();
     currentCapMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
@@ -1421,14 +1557,7 @@ function closeCapital() {
 
 function calcCapital() {
   const renda = parseFloat(document.getElementById('cap-renda').value) || 0;
-  const fixos = parseFloat(document.getElementById('cap-fixos').value) || 0;
-  const invest = parseFloat(document.getElementById('cap-invest').value) || 0;
-  const viagem = parseFloat(document.getElementById('cap-viagem').value) || 0;
-  const compras = parseFloat(document.getElementById('cap-compras').value) || 0;
-  const lazer = parseFloat(document.getElementById('cap-lazer').value) || 0;
-  const reserva = parseFloat(document.getElementById('cap-reserva').value) || 0;
-  
-  const totalAlocado = fixos + invest + viagem + compras + lazer + reserva;
+  const totalAlocado = capAllocs.reduce((sum, cat) => sum + (cat.val || 0), 0);
   const disponivel = renda - totalAlocado;
   
   const elDisp = document.getElementById('cap-disponivel');
@@ -1464,14 +1593,14 @@ function calcCapital() {
 }
 
 function saveCapital() {
+  const allocsObj = {};
+  capAllocs.forEach(cat => {
+    allocsObj[cat.id] = { id: cat.id, name: cat.name, val: cat.val || 0 };
+  });
+
   const newData = {
     renda: parseFloat(document.getElementById('cap-renda').value) || 0,
-    fixos: parseFloat(document.getElementById('cap-fixos').value) || 0,
-    invest: parseFloat(document.getElementById('cap-invest').value) || 0,
-    viagem: parseFloat(document.getElementById('cap-viagem').value) || 0,
-    compras: parseFloat(document.getElementById('cap-compras').value) || 0,
-    lazer: parseFloat(document.getElementById('cap-lazer').value) || 0,
-    reserva: parseFloat(document.getElementById('cap-reserva').value) || 0
+    allocs: allocsObj
   };
   
   if(!currentCapMonth) return;
@@ -1483,6 +1612,94 @@ function saveCapital() {
       showToast('Erro ao salvar.', 'error');
     }
   });
+}
+
+// =============== METAS DE GASTOS ===============
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  try{renderMetas();}catch(e){}
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e && e.person === person) {
+        const c = getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + (Number(e.amount)||0);
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
 }
 </script>
 </body>
