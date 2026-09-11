@@ -6,12 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Finanças">
 <title>Finanças do Casal</title>
-
-<!-- Scripts do Firebase e PDF carregados de forma segura -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -430,7 +427,7 @@ header{
       <div id="history">
         <div class="empty-state">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          <p>Carregando histórico...</p>
+          <p>Nenhuma compra registrada</p>
         </div>
       </div>
     </div>
@@ -467,6 +464,7 @@ header{
   </div>
 
 </div>
+
 
 <!-- ALERT META OVERLAY -->
 <div class="modal-overlay" id="meta-alert-overlay" style="z-index: 2000;" onclick="closeMetaAlert()"></div>
@@ -596,13 +594,11 @@ header{
 </div>
 
 <script>
-// CONFIGURAÇÃO DO FIREBASE
 const firebaseConfig={databaseURL:"https://financas-casal-494ee-default-rtdb.firebaseio.com"};
 firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 const ref=db.ref('compras');
 
-// CONFIGURAÇÕES VISUAIS E DE BANCOS
 const PC={
   'LE':['rgba(59,130,246,0.15)','#3b82f6'],
   'PAIS LE':['rgba(16,185,129,0.15)','#10b981'],
@@ -634,7 +630,7 @@ function getCategory(name) {
   return 'Outros';
 }
 
-// RECONHECIMENTO DE ÁUDIO
+// AUDIO RECOGNITION
 function startAudioRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -652,12 +648,15 @@ function startAudioRecognition() {
   
   recognition.onresult = function(event) {
     const transcript = event.results[0][0].transcript.toLowerCase();
+    
+    // Extrai os números falados (ex: 50.50 ou 50,50)
     const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
     let amount = "";
     if (numMatch) {
         amount = numMatch[0].replace(',', '.');
     }
     
+    // Limpa a frase para tirar o valor e as palavras de ligação
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
                          .replace(/\breais\b/gi, '')
                          .replace(/\bcentavos\b/gi, '')
@@ -671,6 +670,7 @@ function startAudioRecognition() {
                          .trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
     
+    // Abre a tela de cadastro e preenche os campos com o que o robô entendeu
     openSheet();
     if(amount) document.getElementById('inp-amount').value = parseFloat(amount).toFixed(2);
     if(name) document.getElementById('inp-name').value = name;
@@ -718,7 +718,7 @@ function closeSheet() {
 function getEmptyStateHTML() {
   return `<div class="empty-state">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-    <p>Nenhuma compra encontrada no filtro</p>
+    <p>Nenhuma compra encontrada</p>
   </div>`;
 }
 
@@ -751,6 +751,7 @@ function renderPersonCategories(id, list) {
     
     let catHtml = '';
     catOrder.forEach(([cat, data], catIndex) => {
+      
       let subHtml = data.items.sort((a,b)=>b.date.localeCompare(a.date)).map(e => `
         <div class="sub-item">
           <span class="sub-item-name">${fmtDate(e.date)} - ${e.name}</span>
@@ -788,8 +789,8 @@ function setSync(state,txt){
   document.getElementById('sync-txt').textContent=txt;
 }
 function fmt(v){return'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function fmtDate(iso){if(!iso) return ''; const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
-function initials(n){if(!n) return ''; return n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
+function fmtDate(iso){const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`}
+function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2)}
 
 // INVOICE
 const INVOICE_CONFIG={ 'C6':{closeDay:22,dueDay:1,dueSameMonth:false}, 'MERCADO PAGO':{closeDay:15,dueDay:20,dueSameMonth:true} };
@@ -852,7 +853,7 @@ function getFiltered(){
     if(to&&e.date>to)return false;
     if(activePerson&&e.person!==activePerson)return false;
     if(activeInvoice){if(e.date<activeInvoice.start||e.date>activeInvoice.end)return false;}
-    if(search && !(e.name||'').toLowerCase().includes(search)) return false;
+    if(search && !e.name.toLowerCase().includes(search)) return false;
     return true;
   });
 }
@@ -874,7 +875,6 @@ function sumBy(list,key,onlyUnpaid=false){
   const map={};
   list.forEach(e=>{
     if(onlyUnpaid && e.paid) return;
-    if(!e[key]) return;
     map[e[key]]=(map[e[key]]||0)+e.amount;
   });
   return Object.entries(map).sort((a,b)=>b[1]-a[1]);
@@ -1012,59 +1012,51 @@ function render(){
   const chartPerson=document.getElementById('card-person');
   const cardBankPerson=document.getElementById('card-bank-person');
   const histLabel=document.getElementById('hist-label');
-  const hist=document.getElementById('history');
 
   if(activePerson){
     chartBank.style.display='none';chartPerson.style.display='none';cardBankPerson.style.display='';
     document.getElementById('bank-person-label').textContent='Gastos por banco — '+activePerson;
     renderBars('bank-person-bars',sumBy(filtered,'bank',true),'bank');
     histLabel.textContent='Compras de '+activePerson;
-    
-    if(!filtered.length){
-      hist.innerHTML=getEmptyStateHTML();
-    } else {
-      const byBank={};filtered.forEach(e=>{if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
-      const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+e.amount,0)-a[1].reduce((s,e)=>s+e.amount,0));
-      hist.innerHTML=bankOrder.map(([bank,items])=>{
-        const tBruto=items.reduce((s,e)=>s+e.amount,0);
-        const tPago=items.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
-        const tLiq=tBruto-tPago;
-        const bc=BANK_C[BANKS.indexOf(bank)]??'#6366f1';
-        const paidInfo=tPago>0?`<span class="bank-paid-info">- ${fmt(tPago)} recebido</span>`:'';
-        return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div><div class="bank-section-total">${fmt(tLiq)}</div>${paidInfo}</div></div>${items.sort((a,b)=>b.date.localeCompare(a.date)).map(renderItem).join('')}</div>`;
-      }).join('');
-    }
+    const hist=document.getElementById('history');
+    if(!filtered.length){hist.innerHTML=getEmptyStateHTML();return;}
+    const byBank={};filtered.forEach(e=>{if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
+    const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+e.amount,0)-a[1].reduce((s,e)=>s+e.amount,0));
+    hist.innerHTML=bankOrder.map(([bank,items])=>{
+      const tBruto=items.reduce((s,e)=>s+e.amount,0);
+      const tPago=items.filter(e=>e.paid).reduce((s,e)=>s+e.amount,0);
+      const tLiq=tBruto-tPago;
+      const bc=BANK_C[BANKS.indexOf(bank)]??'#6366f1';
+      const paidInfo=tPago>0?`<span class="bank-paid-info">- ${fmt(tPago)} recebido</span>`:'';
+      return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div><div class="bank-section-total">${fmt(tLiq)}</div>${paidInfo}</div></div>${items.sort((a,b)=>b.date.localeCompare(a.date)).map(renderItem).join('')}</div>`;
+    }).join('');
   } else {
     chartBank.style.display='';chartPerson.style.display='';cardBankPerson.style.display='none';
     histLabel.textContent='Histórico de compras';
     renderBars('bank-bars',sumBy(filtered,'bank',true),'bank');
     renderPersonCategories('person-bars', filtered);
-    
-    if(!filtered.length){
-      hist.innerHTML=getEmptyStateHTML();
-    } else {
-      hist.innerHTML=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
-    }
+    const hist=document.getElementById('history');
+    if(!filtered.length){hist.innerHTML=getEmptyStateHTML();return;}
+    hist.innerHTML=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).map(renderItem).join('');
   }
-  
   try{renderCharts();}catch(e){console.warn('Chart error:',e);}
-  try{renderMetas();}catch(e){console.warn('Metas error:',e);}
+  renderMetas();
 }
 
 function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  const lines = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
+  let rows = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
   filtered.forEach(e => {
     let valorStr = e.amount.toString().replace('.', ',');
-    let nameStr = (e.name||'').replace(/"/g, '""');
+    let nameStr = e.name.replace(/"/g, '""');
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    lines.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
+    rows.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
   });
-  
-  const csv = lines.join("\n");
+
+  const csv = rows.join("\r\n");
   const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1146,7 +1138,7 @@ function gerarPDF(){
       if(y>272){doc.addPage();y=16;}
       if(idx%2===0){doc.setFillColor(248,248,252);doc.rect(margin,y-3,usable,7,'F');}
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...cor.text); doc.text(fmtDate(e.date),margin+2,y+1);
-      const nameStr=(e.name||'').length>28?(e.name||'').substring(0,26)+'...':(e.name||''); doc.text(nameStr,margin+22,y+1);
+      const nameStr=e.name.length>28?e.name.substring(0,26)+'...':e.name; doc.text(nameStr,margin+22,y+1);
       doc.setTextColor(...cor.text2); doc.text(e.person,margin+usable*0.62,y+1);
       if(e.paid){ doc.setTextColor(...cor.green); doc.text('✓ Pago',margin+usable*0.79,y+1); } else { doc.setTextColor(245,158,11); doc.text('A receber',margin+usable*0.79,y+1); }
       doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...cor.text); doc.text(fmt(e.amount),pw-margin-2,y+1,{align:'right'});
@@ -1213,93 +1205,6 @@ function renderDonut(containerId, data, colors){
   const svg=`<svg class="donut-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"> <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--bg3)"/> ${arcs} <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text)" font-size="9" font-family="Inter" font-weight="600">${data.length} categ.</text> <text x="${cx}" y="${cy+9}" text-anchor="middle" fill="var(--text2)" font-size="7.5" font-family="Inter">${fmt(total)}</text> </svg>`;
   const legend=data.slice(0,8).map(([name,val],i)=>{ const pct=(val/total*100).toFixed(1); return`<div class="legend-item"><div class="legend-dot" style="background:${colors[i%colors.length]}"></div><span class="legend-name" title="${name}">${name}</span><span class="legend-val">${fmt(val)}</span><span class="legend-pct">${pct}%</span></div>`; }).join('');
   el.innerHTML=`<div class="donut-row">${svg}<div class="donut-legend">${legend}</div></div>`;
-}
-
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  try{renderMetas();}catch(e){}
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + e.amount;
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
 }
 
 function addEntry(){
@@ -1470,6 +1375,24 @@ document.addEventListener('touchend', (e) => {
   swipeItem = null;
 });
 
+const PRELOADED=[
+  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90,paid:false},
+  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99,paid:false},
+  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00,paid:false},
+  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00,paid:false},
+  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00,paid:false},
+  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80,paid:false},
+  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99,paid:false}
+];
+
+ref.once('value', snap => {
+  if(!snap.exists()){ 
+    const b = {};
+    PRELOADED.forEach(e => { b[e.id] = e; });
+    ref.set(b);
+  }
+});
+
 ref.on('value', snap => {
   entries = [];
   if(snap.exists()){ snap.forEach(child => { entries.push(child.val()); }); }
@@ -1483,6 +1406,18 @@ buildInvoiceChips();
 // GESTÃO DE CAPITAL MENSUAL
 let currentCapMonth = '';
 let capRef = null;
+
+function openCapital() {
+  document.getElementById('capital-view').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  
+  if(!currentCapMonth) {
+    const today = new Date();
+    currentCapMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  }
+  document.getElementById('cap-month').value = currentCapMonth;
+  loadCapitalMonth(currentCapMonth);
+}
 
 function loadCapitalMonth(monthStr) {
   if(!monthStr) return;
@@ -1503,18 +1438,6 @@ function loadCapitalMonth(monthStr) {
     
     calcCapital();
   });
-}
-
-function openCapital() {
-  document.getElementById('capital-view').classList.add('show');
-  document.body.style.overflow = 'hidden';
-  
-  if(!currentCapMonth) {
-    const today = new Date();
-    currentCapMonth = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
-  }
-  document.getElementById('cap-month').value = currentCapMonth;
-  loadCapitalMonth(currentCapMonth);
 }
 
 function closeCapital() {
@@ -1587,6 +1510,7 @@ function saveCapital() {
     }
   });
 }
+
 </script>
 </body>
 </html>
