@@ -470,7 +470,6 @@ header{
 
 </div>
 
-
 <!-- ALERT META OVERLAY -->
 <div class="modal-overlay" id="meta-alert-overlay" style="z-index: 2000;" onclick="closeMetaAlert()"></div>
 <div class="bottom-sheet" id="meta-alert" style="z-index: 2001; background: var(--red); color: #fff; text-align:center;">
@@ -491,7 +490,24 @@ header{
     <div class="field"><label>Data</label><input type="date" id="inp-date"></div>
     <div class="field"><label>Valor (R$)</label><input type="number" id="inp-amount" placeholder="0,00" min="0" step="0.01" inputmode="decimal"></div>
   </div>
+  
   <div class="field"><label>Nome da compra</label><input type="text" id="inp-name" placeholder="Ex: Supermercado, Netflix..."></div>
+  
+  <div class="field">
+    <label>Categoria (Opcional)</label>
+    <select id="inp-category">
+      <option value="">Automático (Pelo nome)</option>
+      <option>Mercado / Alimentação</option>
+      <option>Delivery / Restaurante</option>
+      <option>Transporte / Veículo</option>
+      <option>Casa / Construção</option>
+      <option>Saúde / Beleza</option>
+      <option>Assinaturas / Lazer</option>
+      <option>Eletrônicos / Info</option>
+      <option>Outros</option>
+    </select>
+  </div>
+  
   <div class="g2">
     <div class="field">
       <label>Quem comprou</label>
@@ -755,6 +771,7 @@ function addEntry(){
   const bank = document.getElementById('inp-bank').value;
   const amount = parseFloat(document.getElementById('inp-amount').value);
   const isFixed = document.getElementById('chk-recorrente').checked;
+  const manualCat = document.getElementById('inp-category').value;
   
   if(!date || !name || !person || !bank || isNaN(amount) || amount <= 0){
     showToast('Preencha todos os campos corretamente!', 'error');
@@ -762,12 +779,12 @@ function addEntry(){
   }
 
   // ALERTA DE METAS
+  const cat = manualCat ? manualCat : getCategory(name);
   try {
-    const cat = getCategory(name);
     const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
     if (limit > 0) {
       const filtered = getFiltered();
-      const spent = filtered.filter(e => e && e.person === person && getCategory(e.name) === cat).reduce((s, e) => s + (Number(e.amount)||0), 0);
+      const spent = filtered.filter(e => e && e.person === person && (e.category || getCategory(e.name)) === cat).reduce((s, e) => s + (Number(e.amount)||0), 0);
       if ((spent + amount) > limit) {
          showMetaAlert(person, cat, limit, spent, amount);
       }
@@ -783,6 +800,7 @@ function addEntry(){
   const resetForm = () => {
     document.getElementById('inp-name').value = '';
     document.getElementById('inp-amount').value = '';
+    document.getElementById('inp-category').value = '';
     if(isParcel) document.getElementById('chk-parcel').click();
     if(isFixed) document.getElementById('chk-recorrente').click();
     closeSheet();
@@ -796,7 +814,7 @@ function addEntry(){
       const parDate = addMonths(date, i);
       const parName = `${name} ${parNum}/${totalParcelas}`;
       const newRef2 = ref.push();
-      updates[newRef2.key] = { id: newRef2.key, date: parDate, name: parName, person, bank, amount, paid: false, fixed: false };
+      updates[newRef2.key] = { id: newRef2.key, date: parDate, name: parName, category: cat, person, bank, amount, paid: false, fixed: false };
     }
     ref.update(updates, err => {
       btn.disabled = false;
@@ -805,7 +823,7 @@ function addEntry(){
     });
   } else {
     const newRef = ref.push();
-    newRef.set({ id: newRef.key, date, name, person, bank, amount, paid: false, fixed: isFixed }, err => {
+    newRef.set({ id: newRef.key, date, name, category: cat, person, bank, amount, paid: false, fixed: isFixed }, err => {
       btn.disabled = false;
       if(!err){ resetForm(); showToast('Compra salva com sucesso!', 'success'); }
       else { showToast('Erro de conexão!', 'error'); }
@@ -954,7 +972,7 @@ function renderCharts(filtered){
   const wrap=document.getElementById('donut-wrap');
   if(!filtered || !filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
   
-  // FALSE: Garante que TODAS as compras apareçam no gráfico de pizza.
+  // FALSE: Garante que TODAS as compras apareçam no gráfico de pizza (pagas ou não).
   if(chartTab==='pessoa'){ 
     const data=sumBy(filtered,'person',false); 
     const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
@@ -985,111 +1003,6 @@ function renderBars(id,data,type){
   }).join('');
 }
 
-let histOpen=false; 
-let selectMode=false;
-let selectedIds=new Set();
-
-function toggleSelectMode(){
-  selectMode=!selectMode;
-  selectedIds.clear();
-  const bar=document.getElementById('select-bar');
-  const btn=document.getElementById('btn-select-mode');
-  bar.classList.toggle('show',selectMode);
-  btn.style.color=selectMode?'var(--accent)':'';
-  if(selectMode&&!histOpen)toggleHistory();
-  updateSelectBar();
-  render();
-}
-
-function toggleSelect(id){
-  if(selectedIds.has(id))selectedIds.delete(id);
-  else selectedIds.add(id);
-  const chk=document.getElementById('chk-'+id);
-  if(chk)chk.className='item-checkbox'+(selectedIds.has(id)?' checked':'');
-  updateSelectBar();
-}
-
-function selectAll(){
-  const filtered=getFiltered();
-  if(selectedIds.size===filtered.length){selectedIds.clear();}
-  else{filtered.forEach(e=>selectedIds.add(e.id));}
-  updateSelectBar();
-  render();
-}
-
-function updateSelectBar(){
-  const txt=document.getElementById('select-count');
-  if(txt)txt.textContent=`${selectedIds.size} selecionada${selectedIds.size!==1?'s':''}`;
-}
-
-function deleteSelected(){
-  if(!selectedIds.size)return;
-  if(!confirm(`Excluir ${selectedIds.size} compra${selectedIds.size!==1?'s':''}?`))return;
-  const updates={};
-  selectedIds.forEach(id=>{updates[id]=null;});
-  ref.update(updates,()=>{
-    showToast(`${selectedIds.size} compras excluídas!`, 'success');
-    selectedIds.clear();
-    selectMode=false;
-    document.getElementById('select-bar').classList.remove('show');
-    document.getElementById('btn-select-mode').style.color='';
-    render();
-  });
-}
-
-function toggleHistory(){
-  histOpen=!histOpen;
-  const wrap=document.getElementById('history-wrap');
-  const btn=document.getElementById('hist-toggle-btn');
-  const txt=document.getElementById('hist-toggle-txt');
-  wrap.classList.toggle('open',histOpen);
-  btn.classList.toggle('open',histOpen);
-  txt.textContent=histOpen?'Minimizar':'Ver tudo';
-}
-
-function togglePaid(id){
-  const entry=entries.find(e=>e.id===id);
-  if(!entry)return;
-  ref.child(id).update({paid:!entry.paid});
-}
-
-function renderItem(e){
-  if(!e) return '';
-  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
-  const paidClass=e.paid?'paid-item':'';
-  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
-  const checked=selectedIds.has(e.id)?'checked':'';
-  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
-  const paidBtnTxt=e.paid
-    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
-    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
-  
-  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
-  const itemName = e.name || 'Nova Compra';
-
-  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
-    ${selectMode ? '' : `
-    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
-      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
-      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
-    </div>`}
-    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
-      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
-      <div class="item-main">
-        <div class="item-name">${itemName} ${recBadge}</div>
-        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
-        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
-      </div>
-      <div class="item-right">
-        <div class="item-amount">${fmt(e.amount)}</div>
-        <div class="item-date">${fmtDate(e.date)}</div>
-      </div>
-      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
-    </div>
-  </div>`;
-}
-
 function renderPersonCategories(id, list) {
   const el = document.getElementById(id);
   if(!list || !list.length){el.innerHTML = getEmptyStateHTML(); return;}
@@ -1110,7 +1023,7 @@ function renderPersonCategories(id, list) {
     const byCat = {};
     
     items.forEach(e => {
-      const c = getCategory(e.name);
+      const c = e.category || getCategory(e.name);
       if(!byCat[c]) byCat[c] = { total: 0, items: [] };
       byCat[c].total += (Number(e.amount)||0);
       byCat[c].items.push(e);
@@ -1150,6 +1063,43 @@ function renderPersonCategories(id, list) {
     </div>`;
   });
   el.innerHTML = html;
+}
+
+function renderItem(e){
+  if(!e) return '';
+  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
+  const paidClass=e.paid?'paid-item':'';
+  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
+  const checked=selectedIds.has(e.id)?'checked':'';
+  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
+  const paidBtnTxt=e.paid
+    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
+    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
+  
+  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
+  const itemName = e.name || 'Nova Compra';
+
+  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
+    ${selectMode ? '' : `
+    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
+      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
+      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
+    </div>`}
+    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
+      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
+      <div class="item-main">
+        <div class="item-name">${itemName} ${recBadge}</div>
+        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
+        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
+      </div>
+      <div class="item-right">
+        <div class="item-amount">${fmt(e.amount)}</div>
+        <div class="item-date">${fmtDate(e.date)}</div>
+      </div>
+      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
+    </div>
+  </div>`;
 }
 
 function render(){
@@ -1227,14 +1177,15 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  const lines = ["Data,Nome da Compra,Pessoa,Banco,Valor,Status,Recorrente"];
+  const lines = ["Data,Nome da Compra,Categoria,Pessoa,Banco,Valor,Status,Recorrente"];
   filtered.forEach(e => {
     if(!e) return;
     let valorStr = (e.amount || 0).toString().replace('.', ',');
     let nameStr = (e.name || '').replace(/"/g, '""');
+    let catStr = e.category || getCategory(e.name);
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    lines.push(`${e.date},"${nameStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
+    lines.push(`${e.date},"${nameStr}","${catStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
   });
   
   const csv = lines.join("\r\n");
@@ -1371,7 +1322,6 @@ function updateParcelPreview(){
   preview.classList.add('show'); preview.innerHTML=`Serão criadas <strong>${remaining}</strong> parcela${remaining!==1?'s':''} de ${firstName} (${atual}/${total} até ${total}/${total})<br>Da data <strong>${fmtDate(date)}</strong> até <strong>${fmtDate(lastDate)}</strong>`;
 }
 
-
 // =============== LÓGICA DO SWIPE (ARRASTAR) ===============
 let startX = 0, startY = 0, currentX = 0, isDragging = false, swipeItem = null, isHorizontal = false, firstMove = true;
 
@@ -1448,6 +1398,94 @@ ref.on('value', snap => {
 document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
 buildInvoiceChips();
 
+// =============== METAS DE GASTOS ===============
+let metas = {};
+const refMetas = db.ref('metas');
+refMetas.on('value', snap => {
+  metas = snap.val() || {};
+  try{renderMetas();}catch(e){}
+});
+
+function showMetaAlert(person, cat, limit, spent, amount) {
+   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
+   document.getElementById('meta-alert-overlay').classList.add('show');
+   document.getElementById('meta-alert').classList.add('show');
+}
+
+function closeMetaAlert() {
+   document.getElementById('meta-alert-overlay').classList.remove('show');
+   document.getElementById('meta-alert').classList.remove('show');
+}
+
+function updateMeta(person, cat, val) {
+  const num = parseFloat(val.replace(',','.'));
+  if (isNaN(num) || num <= 0) {
+    refMetas.child(person).child(cat).remove();
+  } else {
+    refMetas.child(person).child(cat).set(num);
+  }
+  showToast('Meta atualizada!', 'success');
+}
+
+function renderMetas() {
+  const el = document.getElementById('metas-list');
+  if(!el) return;
+  const filtered = getFiltered();
+  let html = '';
+
+  Object.keys(PC).forEach((person, pIndex) => {
+    const [bg, fg] = PC[person];
+    const spentByCat = {};
+    filtered.forEach(e => {
+      if (e && e.person === person) {
+        const c = e.category || getCategory(e.name);
+        spentByCat[c] = (spentByCat[c] || 0) + (Number(e.amount)||0);
+      }
+    });
+
+    let catHtml = '';
+    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
+    allCats.forEach(cat => {
+      const spent = spentByCat[cat] || 0;
+      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
+      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
+      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
+
+      catHtml += `
+        <div class="meta-item">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
+              <span style="font-size:10px; color:var(--text3)">/</span>
+              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
+            </div>
+          </div>
+          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
+            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+      <div class="cat-group" id="mg-${pIndex}">
+        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
+          <div class="cat-header-name">
+            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
+            ${person}
+          </div>
+          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
+          ${catHtml}
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
 // =============== GESTÃO DE CAPITAL MENSUAL ===============
 let currentCapMonth = '';
 let capRef = null;
@@ -1462,9 +1500,7 @@ const DEFAULT_CAP_CATS = [
   { id: 'c6', name: '🛡️ Reserva Emergência', val: 0 }
 ];
 
-function generateId() {
-  return Math.random().toString(36).substr(2, 9);
-}
+function generateId() { return Math.random().toString(36).substr(2, 9); }
 
 function loadCapitalMonth(monthStr) {
   if(!monthStr) return;
@@ -1476,10 +1512,8 @@ function loadCapitalMonth(monthStr) {
     const data = snap.exists() ? snap.val() : null;
     if(data) {
       document.getElementById('cap-renda').value = data.renda || '';
-      if(data.allocs) {
-        capAllocs = Object.values(data.allocs);
-      } else {
-        // Migração de dados antigos
+      if(data.allocs) { capAllocs = Object.values(data.allocs); } 
+      else {
         capAllocs = [
           { id: generateId(), name: '🏠 Custos Fixos', val: data.fixos || 0 },
           { id: generateId(), name: '📈 Investimentos', val: data.invest || 0 },
@@ -1529,15 +1563,8 @@ function removeCapCategory(id) {
   calcCapital();
 }
 
-function updateCapName(id, name) {
-  const cat = capAllocs.find(c => c.id === id);
-  if(cat) cat.name = name;
-}
-
-function updateCapVal(id, val) {
-  const cat = capAllocs.find(c => c.id === id);
-  if(cat) cat.val = parseFloat(val) || 0;
-}
+function updateCapName(id, name) { const cat = capAllocs.find(c => c.id === id); if(cat) cat.name = name; }
+function updateCapVal(id, val) { const cat = capAllocs.find(c => c.id === id); if(cat) cat.val = parseFloat(val) || 0; }
 
 function openCapital() {
   document.getElementById('capital-view').classList.add('show');
@@ -1578,128 +1605,28 @@ function calcCapital() {
   elBar.style.width = pct + '%';
   
   if(disponivel > 0) {
-    elDisp.style.color = 'var(--green)';
-    elBar.style.background = 'var(--green)';
+    elDisp.style.color = 'var(--green)'; elBar.style.background = 'var(--green)';
     elMsg.textContent = `Você ainda pode alocar ${fmt(disponivel)}`;
   } else if (disponivel < 0) {
-    elDisp.style.color = 'var(--red)';
-    elBar.style.background = 'var(--red)';
+    elDisp.style.color = 'var(--red)'; elBar.style.background = 'var(--red)';
     elMsg.textContent = `Atenção: Você alocou ${fmt(Math.abs(disponivel))} a mais do que sua renda!`;
   } else {
-    elDisp.style.color = 'var(--blue)';
-    elBar.style.background = 'var(--blue)';
+    elDisp.style.color = 'var(--blue)'; elBar.style.background = 'var(--blue)';
     elMsg.textContent = 'Parabéns! Todo o seu capital foi distribuído.';
   }
 }
 
 function saveCapital() {
   const allocsObj = {};
-  capAllocs.forEach(cat => {
-    allocsObj[cat.id] = { id: cat.id, name: cat.name, val: cat.val || 0 };
-  });
+  capAllocs.forEach(cat => { allocsObj[cat.id] = { id: cat.id, name: cat.name, val: cat.val || 0 }; });
 
-  const newData = {
-    renda: parseFloat(document.getElementById('cap-renda').value) || 0,
-    allocs: allocsObj
-  };
+  const newData = { renda: parseFloat(document.getElementById('cap-renda').value) || 0, allocs: allocsObj };
   
   if(!currentCapMonth) return;
   db.ref('capital/' + currentCapMonth).set(newData, err => {
-    if(!err) {
-      showToast('Capital de ' + currentCapMonth + ' salvo!', 'success');
-      closeCapital();
-    } else {
-      showToast('Erro ao salvar.', 'error');
-    }
+    if(!err) { showToast('Capital de ' + currentCapMonth + ' salvo!', 'success'); closeCapital(); } 
+    else { showToast('Erro ao salvar.', 'error'); }
   });
-}
-
-// =============== METAS DE GASTOS ===============
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  try{renderMetas();}catch(e){}
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e && e.person === person) {
-        const c = getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + (Number(e.amount)||0);
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
 }
 </script>
 </body>
