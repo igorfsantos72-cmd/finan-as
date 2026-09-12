@@ -164,7 +164,7 @@ header{
 .hist-toggle svg{transition:transform .25s ease}
 .hist-toggle.open svg{transform:rotate(180deg)}
 #history-wrap{overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1);max-height:0}
-#history-wrap.open{max-height:99999px}
+#history-wrap.open{max-height:8000px}
 .item { border-bottom: 1px solid var(--border); position: relative; overflow: hidden; padding: 0; }
 .item:last-child { border-bottom: none; }
 .item-content { display: flex; align-items: flex-start; gap: 10px; padding: .75rem 0; width: 100%; background: var(--bg2); position: relative; z-index: 1; touch-action: pan-y; transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -396,7 +396,7 @@ header{
       </button>
       <button class="btn-csv" onclick="gerarCSV()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        CSV / Excel
+        CSV
       </button>
     </div>
   </div>
@@ -741,7 +741,7 @@ function startAudioRecognition() {
   
   recognition.onerror = function(event) {
     if(event.error === 'not-allowed') {
-      showToast('Permissão negada! Lembre-se de rodar o site em HTTPS.', 'error');
+      showToast('Permissão de microfone negada! (Use HTTPS)', 'error');
     } else {
       showToast('Erro no áudio. Tente novamente.', 'error');
     }
@@ -972,13 +972,12 @@ function renderCharts(filtered){
   const wrap=document.getElementById('donut-wrap');
   if(!filtered || !filtered.length){wrap.innerHTML=getEmptyStateHTML();return;}
   
-  // FALSE: Garante que TODAS as compras apareçam no gráfico de pizza (pagas ou não).
   if(chartTab==='pessoa'){ 
-    const data=sumBy(filtered,'person',false); 
+    const data=sumBy(filtered,'person',true); // TRUE: Não soma os pagos
     const colors=data.map(([name])=>(PC[name]||['','#6366f1'])[1]); 
     renderDonut('donut-wrap',data,colors);
   } else { 
-    const data=sumBy(filtered,'bank',false); 
+    const data=sumBy(filtered,'bank',true); // TRUE: Não soma os pagos
     const colors=data.map(([name])=>{
       const idx=BANKS.indexOf(name);
       return (idx>=0 && BANK_C[idx]) ? BANK_C[idx] : '#6366f1';
@@ -1001,6 +1000,111 @@ function renderBars(id,data,type){
     }
     return`<div class="bar-row"><span class="bar-name" title="${name}">${name}</span><div class="bar-track"><div class="bar-fill" style="width:${(val/max*100).toFixed(1)}%;background:${c}"></div></div><span class="bar-val">${fmt(val)}</span></div>`;
   }).join('');
+}
+
+let histOpen=false; 
+let selectMode=false;
+let selectedIds=new Set();
+
+function toggleSelectMode(){
+  selectMode=!selectMode;
+  selectedIds.clear();
+  const bar=document.getElementById('select-bar');
+  const btn=document.getElementById('btn-select-mode');
+  bar.classList.toggle('show',selectMode);
+  btn.style.color=selectMode?'var(--accent)':'';
+  if(selectMode&&!histOpen)toggleHistory();
+  updateSelectBar();
+  render();
+}
+
+function toggleSelect(id){
+  if(selectedIds.has(id))selectedIds.delete(id);
+  else selectedIds.add(id);
+  const chk=document.getElementById('chk-'+id);
+  if(chk)chk.className='item-checkbox'+(selectedIds.has(id)?' checked':'');
+  updateSelectBar();
+}
+
+function selectAll(){
+  const filtered=getFiltered();
+  if(selectedIds.size===filtered.length){selectedIds.clear();}
+  else{filtered.forEach(e=>selectedIds.add(e.id));}
+  updateSelectBar();
+  render();
+}
+
+function updateSelectBar(){
+  const txt=document.getElementById('select-count');
+  if(txt)txt.textContent=`${selectedIds.size} selecionada${selectedIds.size!==1?'s':''}`;
+}
+
+function deleteSelected(){
+  if(!selectedIds.size)return;
+  if(!confirm(`Excluir ${selectedIds.size} compra${selectedIds.size!==1?'s':''}?`))return;
+  const updates={};
+  selectedIds.forEach(id=>{updates[id]=null;});
+  ref.update(updates,()=>{
+    showToast(`${selectedIds.size} compras excluídas!`, 'success');
+    selectedIds.clear();
+    selectMode=false;
+    document.getElementById('select-bar').classList.remove('show');
+    document.getElementById('btn-select-mode').style.color='';
+    render();
+  });
+}
+
+function toggleHistory(){
+  histOpen=!histOpen;
+  const wrap=document.getElementById('history-wrap');
+  const btn=document.getElementById('hist-toggle-btn');
+  const txt=document.getElementById('hist-toggle-txt');
+  wrap.classList.toggle('open',histOpen);
+  btn.classList.toggle('open',histOpen);
+  txt.textContent=histOpen?'Minimizar':'Ver tudo';
+}
+
+function togglePaid(id){
+  const entry=entries.find(e=>e.id===id);
+  if(!entry)return;
+  ref.child(id).update({paid:!entry.paid});
+}
+
+function renderItem(e){
+  if(!e) return '';
+  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
+  const paidClass=e.paid?'paid-item':'';
+  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
+  const checked=selectedIds.has(e.id)?'checked':'';
+  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
+  const paidBtnTxt=e.paid
+    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
+    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
+  
+  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
+  const itemName = e.name || 'Nova Compra';
+
+  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
+    ${selectMode ? '' : `
+    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
+      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
+      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
+    </div>`}
+    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
+      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
+      <div class="item-main">
+        <div class="item-name">${itemName} ${recBadge}</div>
+        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
+        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
+      </div>
+      <div class="item-right">
+        <div class="item-amount">${fmt(e.amount)}</div>
+        <div class="item-date">${fmtDate(e.date)}</div>
+      </div>
+      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
+    </div>
+  </div>`;
 }
 
 function renderPersonCategories(id, list) {
@@ -1063,43 +1167,6 @@ function renderPersonCategories(id, list) {
     </div>`;
   });
   el.innerHTML = html;
-}
-
-function renderItem(e){
-  if(!e) return '';
-  const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
-  const paidClass=e.paid?'paid-item':'';
-  const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
-  const checked=selectedIds.has(e.id)?'checked':'';
-  const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
-  const paidBtnTxt=e.paid
-    ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
-    :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
-  
-  const swipeTxt = e.paid ? 'Desfazer' : 'Pago';
-  const itemName = e.name || 'Nova Compra';
-
-  return`<div class="item ${paidClass} ${selectMode?'selecting':''}" id="item-${e.id}" data-id="${e.id}">
-    ${selectMode ? '' : `
-    <div class="swipe-bg-under" id="swipe-bg-${e.id}">
-      <span class="action-left"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> ${swipeTxt}</span>
-      <span class="action-right">Excluir <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></span>
-    </div>`}
-    <div class="item-content" onclick="${selectMode?`toggleSelect('${e.id}')`:''}">
-      <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
-      <div class="item-main">
-        <div class="item-name">${itemName} ${recBadge}</div>
-        <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
-        ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
-      </div>
-      <div class="item-right">
-        <div class="item-amount">${fmt(e.amount)}</div>
-        <div class="item-date">${fmtDate(e.date)}</div>
-      </div>
-      ${selectMode?'':` <button class="del-btn" onclick="removeEntry('${e.id}')" title="Remover"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>`}
-    </div>
-  </div>`;
 }
 
 function render(){
@@ -1177,7 +1244,10 @@ function gerarCSV() {
   const filtered = getFiltered();
   if(!filtered.length) { showToast('Nenhum dado para exportar.', 'info'); return; }
   
-  const lines = ["Data,Nome da Compra,Categoria,Pessoa,Banco,Valor,Status,Recorrente"];
+  // Usando um array limpo para evitar problemas de string literal com \n no compilador
+  const linhas = [];
+  linhas.push("Data,Nome da Compra,Categoria,Pessoa,Banco,Valor,Status,Recorrente");
+  
   filtered.forEach(e => {
     if(!e) return;
     let valorStr = (e.amount || 0).toString().replace('.', ',');
@@ -1185,11 +1255,11 @@ function gerarCSV() {
     let catStr = e.category || getCategory(e.name);
     let statusStr = e.paid ? 'Pago' : 'Pendente';
     let fixoStr = e.fixed ? 'Sim' : 'Não';
-    lines.push(`${e.date},"${nameStr}","${catStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
+    linhas.push(`${e.date},"${nameStr}","${catStr}",${e.person},${e.bank},"${valorStr}",${statusStr},${fixoStr}`);
   });
   
-  const csv = lines.join("\r\n");
-  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], {type: 'text/csv;charset=utf-8;'});
+  const csvStr = linhas.join("\r\n");
+  const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvStr], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
@@ -1387,6 +1457,25 @@ document.addEventListener('touchend', (e) => {
   swipeItem = null;
 });
 
+// PRELOADED (Mock Data)
+const PRELOADED=[
+  {id:'pre1',date:"2026-05-16",name:"ESMALTE MELINDA",person:"LE",bank:"MERCADO PAGO",amount:9.90,paid:false},
+  {id:'pre2',date:"2026-05-16",name:"ESMALTE SONEDO",person:"LE",bank:"MERCADO PAGO",amount:13.99,paid:false},
+  {id:'pre3',date:"2026-05-16",name:"BRINCO",person:"LE",bank:"MERCADO PAGO",amount:22.00,paid:false},
+  {id:'pre4',date:"2026-05-18",name:"MARMITA DURVAL",person:"LE",bank:"MERCADO PAGO",amount:28.00,paid:false},
+  {id:'pre5',date:"2026-04-22",name:"AFPESP SAHA 2/4",person:"PAIS LE",bank:"MERCADO PAGO",amount:495.00,paid:false},
+  {id:'pre6',date:"2026-05-18",name:"PRESENTE IASMIN",person:"PAIS LE",bank:"MERCADO PAGO",amount:157.80,paid:false},
+  {id:'pre7',date:"2026-05-16",name:"FACA CAMICADO",person:"IGOR",bank:"MERCADO PAGO",amount:19.99,paid:false}
+];
+
+ref.once('value', snap => {
+  if(!snap.exists()){ 
+    const b = {};
+    PRELOADED.forEach(e => { b[e.id] = e; });
+    ref.set(b);
+  }
+});
+
 // =============== CARREGAMENTO INICIAL DO FIREBASE ===============
 ref.on('value', snap => {
   entries = [];
@@ -1398,95 +1487,7 @@ ref.on('value', snap => {
 document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
 buildInvoiceChips();
 
-// =============== METAS DE GASTOS ===============
-let metas = {};
-const refMetas = db.ref('metas');
-refMetas.on('value', snap => {
-  metas = snap.val() || {};
-  try{renderMetas();}catch(e){}
-});
-
-function showMetaAlert(person, cat, limit, spent, amount) {
-   document.getElementById('meta-alert-text').innerHTML = `A nova compra de <strong>${fmt(amount)}</strong> estrapolou a meta de <strong>${cat}</strong> de <strong>${person}</strong>.<br><br>Limite definido: <strong>${fmt(limit)}</strong><br>Total acumulado no filtro: <strong>${fmt(spent + amount)}</strong>`;
-   document.getElementById('meta-alert-overlay').classList.add('show');
-   document.getElementById('meta-alert').classList.add('show');
-}
-
-function closeMetaAlert() {
-   document.getElementById('meta-alert-overlay').classList.remove('show');
-   document.getElementById('meta-alert').classList.remove('show');
-}
-
-function updateMeta(person, cat, val) {
-  const num = parseFloat(val.replace(',','.'));
-  if (isNaN(num) || num <= 0) {
-    refMetas.child(person).child(cat).remove();
-  } else {
-    refMetas.child(person).child(cat).set(num);
-  }
-  showToast('Meta atualizada!', 'success');
-}
-
-function renderMetas() {
-  const el = document.getElementById('metas-list');
-  if(!el) return;
-  const filtered = getFiltered();
-  let html = '';
-
-  Object.keys(PC).forEach((person, pIndex) => {
-    const [bg, fg] = PC[person];
-    const spentByCat = {};
-    filtered.forEach(e => {
-      if (e && e.person === person) {
-        const c = e.category || getCategory(e.name);
-        spentByCat[c] = (spentByCat[c] || 0) + (Number(e.amount)||0);
-      }
-    });
-
-    let catHtml = '';
-    const allCats = Object.keys(CATEGORIES).concat(['Outros']);
-    allCats.forEach(cat => {
-      const spent = spentByCat[cat] || 0;
-      const limit = (metas[person] && metas[person][cat]) ? metas[person][cat] : 0;
-      const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
-      const barColor = pct >= 100 ? 'var(--red)' : (pct >= 80 ? 'var(--orange)' : 'var(--green)');
-
-      catHtml += `
-        <div class="meta-item">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; color:var(--text2); font-weight:500;">${cat}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span style="font-size:11px; font-weight:600; color:${pct >= 100 ? 'var(--red)' : 'var(--text)'}">${fmt(spent)}</span>
-              <span style="font-size:10px; color:var(--text3)">/</span>
-              <input type="number" step="0.01" inputmode="decimal" class="meta-input" placeholder="R$ 0,00" value="${limit || ''}" onchange="updateMeta('${person}', '${cat}', this.value)">
-            </div>
-          </div>
-          <div class="bar-track" style="height:6px; background:var(--bg3); border-radius:3px; overflow:hidden;">
-            <div class="bar-fill" style="width:${pct}%; background:${barColor}; height:100%; border-radius:3px; transition:width 0.4s"></div>
-          </div>
-        </div>
-      `;
-    });
-
-    html += `
-      <div class="cat-group" id="mg-${pIndex}">
-        <div class="cat-header" onclick="document.getElementById('mg-${pIndex}').classList.toggle('open')">
-          <div class="cat-header-name">
-            <div class="avatar" style="width:24px;height:24px;font-size:9px;background:${bg};color:${fg};margin-top:0">${initials(person)}</div>
-            ${person}
-          </div>
-          <svg class="cat-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="cat-body" style="padding: 12px; background:var(--bg2);">
-          ${catHtml}
-        </div>
-      </div>
-    `;
-  });
-  el.innerHTML = html;
-}
-
-// =============== GESTÃO DE CAPITAL MENSUAL ===============
+// =============== GESTÃO DE CAPITAL MENSAL ===============
 let currentCapMonth = '';
 let capRef = null;
 let capAllocs = [];
