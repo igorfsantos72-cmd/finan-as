@@ -291,8 +291,6 @@ header{
 /* METAS */
 .meta-item { display: flex; flex-direction: column; margin-bottom: 14px; }
 .meta-item:last-child { margin-bottom: 0; }
-.meta-input { background: rgba(255,255,255,0.05); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 12px; padding: 4px 6px; width: 80px; text-align: right; outline: none; transition: border-color 0.2s;}
-.meta-input:focus { border-color: var(--accent); }
 
 /* CAPITAL VIEW */
 .capital-view { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 9999; transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); overflow-y: auto; padding-bottom: 80px; }
@@ -306,6 +304,7 @@ header{
 .cap-total-card input::placeholder { color: rgba(255,255,255,0.5); }
 .cap-summary { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem 1rem; }
 .cap-footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); padding: 1rem; border-top: 1px solid var(--border); z-index: 10; }
+
 .cap-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; font-weight: 500; color: var(--text); }
 .cap-row:last-child { margin-bottom: 0; }
 .cap-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--rm); color: var(--text); padding: 8px 12px; width: 100px; text-align: right; outline: none; font-family: 'Inter', sans-serif; transition: border-color 0.2s;}
@@ -469,8 +468,7 @@ header{
     </div>
   </div>
 
-</div> <!-- FINAL DO WRAP -->
-
+</div>
 
 <!-- ALERT META OVERLAY -->
 <div class="modal-overlay" id="meta-alert-overlay" style="z-index: 2000;" onclick="closeMetaAlert()"></div>
@@ -523,6 +521,7 @@ header{
       <select id="inp-bank">
         <option value="">Selecione...</option>
         <option>C6</option><option>MERCADO PAGO</option>
+        <option>NUBANK</option><option>PIX</option>
       </select>
     </div>
   </div>
@@ -629,8 +628,8 @@ const PC={
   'PAIS IGOR':['rgba(245,158,11,0.15)','#f59e0b'],
   'IGOR':['rgba(239,68,68,0.15)','#ef4444']
 };
-const BANK_C=['#3b82f6','#10b981'];
-const BANKS=['C6','MERCADO PAGO'];
+const BANK_C=['#3b82f6','#10b981','#8b5cf6','#06b6d4'];
+const BANKS=['C6','MERCADO PAGO','NUBANK','PIX'];
 
 let entries=[];
 
@@ -715,12 +714,14 @@ function startAudioRecognition() {
   recognition.onresult = function(event) {
     const transcript = event.results[0][0].transcript.toLowerCase();
     
+    // Extrai os números falados
     const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
     let amount = "";
     if (numMatch) {
         amount = numMatch[0].replace(',', '.');
     }
     
+    // Limpa a frase
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
                          .replace(/\breais\b/gi, '')
                          .replace(/\bcentavos\b/gi, '')
@@ -796,6 +797,7 @@ function addEntry(){
   const isParcel = document.getElementById('chk-parcel').checked;
   const totalParcelas = parseInt(document.getElementById('inp-parcelas').value) || 0;
   const parcelaAtual = parseInt(document.getElementById('inp-parcela-atual').value) || 1;
+  const isPix = (bank === 'PIX');
   const btn = document.getElementById('btn-add');
   btn.disabled = true;
 
@@ -816,7 +818,7 @@ function addEntry(){
       const parDate = addMonths(date, i);
       const parName = `${name} ${parNum}/${totalParcelas}`;
       const newRef2 = ref.push();
-      updates[newRef2.key] = { id: newRef2.key, date: parDate, name: parName, category: cat, person, bank, amount, paid: false, fixed: false };
+      updates[newRef2.key] = { id: newRef2.key, date: parDate, name: parName, category: cat, person, bank, amount, paid: isPix, fixed: false };
     }
     ref.update(updates, err => {
       btn.disabled = false;
@@ -825,7 +827,7 @@ function addEntry(){
     });
   } else {
     const newRef = ref.push();
-    newRef.set({ id: newRef.key, date, name, category: cat, person, bank, amount, paid: false, fixed: isFixed }, err => {
+    newRef.set({ id: newRef.key, date, name, category: cat, person, bank, amount, paid: isPix, fixed: isFixed }, err => {
       btn.disabled = false;
       if(!err){ resetForm(); showToast('Compra salva com sucesso!', 'success'); }
       else { showToast('Erro de conexão!', 'error'); }
@@ -841,7 +843,7 @@ function removeEntry(id) {
 
 
 // =============== REGRAS DE FATURAS ===============
-const INVOICE_CONFIG={ 'C6':{closeDay:22,dueDay:1,dueSameMonth:false}, 'MERCADO PAGO':{closeDay:15,dueDay:20,dueSameMonth:true} };
+const INVOICE_CONFIG={ 'C6':{closeDay:22,dueDay:1,dueSameMonth:false}, 'MERCADO PAGO':{closeDay:15,dueDay:20,dueSameMonth:true}, 'NUBANK':{closeDay:19,dueDay:26,dueSameMonth:true} };
 function getInvoiceCycle(bank,year,month){
   const cfg=INVOICE_CONFIG[bank];if(!cfg)return null;
   const closeDate=new Date(year,month-1,cfg.closeDay);
@@ -859,10 +861,10 @@ function buildInvoiceChips(){
   for(let i=-1;i<=6;i++){
     const ref2=new Date(today.getFullYear(),today.getMonth()-i+1,1);
     const yr=ref2.getFullYear(); const mo=ref2.getMonth()+1;
-    const c6=getInvoiceCycle('C6',yr,mo); const mp=getInvoiceCycle('MERCADO PAGO',yr,mo);
-    if(!c6||!mp)continue;
-    const start=c6.startStr<mp.startStr?c6.startStr:mp.startStr;
-    const end=c6.endStr>mp.endStr?c6.endStr:mp.endStr;
+    const c6=getInvoiceCycle('C6',yr,mo); const mp=getInvoiceCycle('MERCADO PAGO',yr,mo); const nu=getInvoiceCycle('NUBANK',yr,mo);
+    if(!c6||!mp||!nu)continue;
+    let start = c6.startStr; if(mp.startStr < start) start = mp.startStr; if(nu.startStr < start) start = nu.startStr;
+    let end = c6.endStr; if(mp.endStr > end) end = mp.endStr; if(nu.endStr > end) end = nu.endStr;
     if(seen.has(start))continue;
     seen.add(start);
     const label=new Date(mp.endStr+'T12:00:00').toLocaleString('pt-BR',{month:'short',year:'2-digit'});
@@ -1139,7 +1141,6 @@ function renderPersonCategories(id, list) {
     
     let catHtml = '';
     catOrder.forEach(([cat, data], catIndex) => {
-      
       let subHtml = data.items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e => `
         <div class="sub-item">
           <span class="sub-item-name">${fmtDate(e.date)} - ${e.name||'Compra'}</span>
