@@ -164,7 +164,7 @@ header{
 .hist-toggle svg{transition:transform .25s ease}
 .hist-toggle.open svg{transform:rotate(180deg)}
 #history-wrap{overflow:hidden;transition:max-height .35s cubic-bezier(.4,0,.2,1);max-height:0}
-#history-wrap.open{max-height:99999px}
+#history-wrap.open{max-height:8000px}
 .item { border-bottom: 1px solid var(--border); position: relative; overflow: hidden; padding: 0; }
 .item:last-child { border-bottom: none; }
 .item-content { display: flex; align-items: flex-start; gap: 10px; padding: .75rem 0; width: 100%; background: var(--bg2); position: relative; z-index: 1; touch-action: pan-y; transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
@@ -312,6 +312,22 @@ header{
 .cap-name-input:focus { border-bottom-color:var(--accent); }
 .cap-del-btn { color:var(--text3); background:none; border:none; cursor:pointer; margin-left:8px; font-size:14px; padding: 4px;}
 .cap-del-btn:hover { color:var(--red); }
+
+/* PARCEL GROUP CSS */
+.parcel-group-children {
+  display: none;
+  padding-left: 10px;
+  margin-left: 14px;
+  border-left: 2px dashed var(--border2);
+  margin-bottom: 10px;
+}
+.parcel-group-children.show { display: block; }
+.badge-parcel {
+  font-size: 9px; background: rgba(59,130,246,0.15); color: var(--blue);
+  padding: 2px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(59,130,246,0.3); transition: all 0.2s; margin-left: 4px;
+}
+.badge-parcel:hover { background: var(--blue); color: #fff; }
 </style>
 </head>
 <body>
@@ -517,7 +533,7 @@ header{
       </select>
     </div>
     <div class="field">
-      <label>Banco</label>
+      <label>Banco / Método</label>
       <select id="inp-bank">
         <option value="">Selecione...</option>
         <option>C6</option><option>MERCADO PAGO</option>
@@ -714,14 +730,14 @@ function startAudioRecognition() {
   recognition.onresult = function(event) {
     const transcript = event.results[0][0].transcript.toLowerCase();
     
-    // Extrai os números falados
+    // Extrai os números falados (ex: 50.50 ou 50,50)
     const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
     let amount = "";
     if (numMatch) {
         amount = numMatch[0].replace(',', '.');
     }
     
-    // Limpa a frase
+    // Limpa a frase para tirar o valor e as palavras de ligação
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
                          .replace(/\breais\b/gi, '')
                          .replace(/\bcentavos\b/gi, '')
@@ -735,6 +751,7 @@ function startAudioRecognition() {
                          .trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
     
+    // Abre a tela de cadastro e preenche os campos
     openSheet();
     if(amount) document.getElementById('inp-amount').value = parseFloat(amount).toFixed(2);
     if(name) document.getElementById('inp-name').value = name;
@@ -948,6 +965,59 @@ function setChartTab(tab){
   render(); 
 }
 
+function toggleParcelGroup(id) {
+  const el = document.getElementById('pgi-' + id);
+  if(el) el.classList.toggle('show');
+}
+
+function buildGroupedHTML(list) {
+  if(!list || !list.length) return getEmptyStateHTML();
+  let finalItems = [];
+  let parcelGroups = {};
+  
+  list.forEach(e => {
+    const match = (e.name||'').match(/^(.*?)(\s+\d+\/\d+)$/);
+    if (match) {
+      const baseName = match[1].trim();
+      const key = baseName + '|' + e.person + '|' + e.bank;
+      if (!parcelGroups[key]) parcelGroups[key] = [];
+      parcelGroups[key].push(e);
+    } else {
+      finalItems.push({ type: 'single', item: e, date: e.date });
+    }
+  });
+  
+  Object.keys(parcelGroups).forEach(key => {
+    const items = parcelGroups[key];
+    if (items.length === 1) {
+      finalItems.push({ type: 'single', item: items[0], date: items[0].date });
+    } else {
+      let rep = items.slice().sort((a,b) => a.date.localeCompare(b.date)).find(x => !x.paid);
+      if(!rep) rep = items.slice().sort((a,b) => b.date.localeCompare(a.date))[0];
+      finalItems.push({ type: 'group', items: items.sort((a,b) => b.date.localeCompare(a.date) || ((b.id||'')>(a.id||'')?1:-1)), rep: rep, date: rep.date });
+    }
+  });
+  
+  finalItems.sort((a, b) => b.date.localeCompare(a.date) || (((b.item||b.rep).id||'') > ((a.item||a.rep).id||'') ? 1 : -1));
+  
+  return finalItems.map(f => {
+    if(f.type === 'single') return renderItem(f.item, false, 0);
+    
+    const repHtml = renderItem(f.rep, true, f.items.length);
+    const others = f.items.filter(x => x.id !== f.rep.id);
+    const othersHtml = others.map(x => renderItem(x, false, 0)).join('');
+    
+    return `
+    <div class="parcel-group">
+        ${repHtml}
+        <div class="parcel-group-children" id="pgi-${f.rep.id}">
+            ${othersHtml}
+        </div>
+    </div>
+    `;
+  }).join('');
+}
+
 function renderDonut(containerId, data, colors){
   const el=document.getElementById(containerId);
   if(!data || !data.length){el.innerHTML=`<div class="empty-state" style="font-size:20px;">🎉<p style="font-size:12px; margin-top:8px;">Tudo pago ou sem pendências!</p></div>`;return;}
@@ -1074,13 +1144,19 @@ function togglePaid(id){
   ref.child(id).update({paid:!entry.paid});
 }
 
-function renderItem(e){
+function renderItem(e, isRep = false, groupCount = 0){
   if(!e) return '';
   const[bg,fg]=PC[e.person]||['rgba(99,102,241,0.15)','#6366f1'];
   const paidClass=e.paid?'paid-item':'';
   const paidBtnClass=e.paid?'paid-btn paid':'paid-btn';
   const checked=selectedIds.has(e.id)?'checked':'';
   const recBadge = e.fixed ? '<span class="badge-recorrente">🔄 Recorrente</span>' : '';
+  
+  let groupBadge = '';
+  if(isRep && groupCount > 1) {
+    groupBadge = `<span class="badge-parcel" onclick="event.stopPropagation(); toggleParcelGroup('${e.id}')">📦 Ver ${groupCount} parcelas ▾</span>`;
+  }
+
   const paidBtnTxt=e.paid
     ?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Pago`
     :`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>A receber`;
@@ -1098,7 +1174,7 @@ function renderItem(e){
       <div class="item-checkbox ${checked}" id="chk-${e.id}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg></div>
       <div class="avatar" style="background:${bg};color:${fg}">${initials(e.person)}</div>
       <div class="item-main">
-        <div class="item-name">${itemName} ${recBadge}</div>
+        <div class="item-name">${itemName} ${recBadge} ${groupBadge}</div>
         <div class="item-meta"><span>${e.person}</span><span class="pill">${e.bank}</span></div>
         ${selectMode?'':` <button class="${paidBtnClass}" onclick="togglePaid('${e.id}')">${paidBtnTxt}</button>`}
       </div>
@@ -1141,6 +1217,7 @@ function renderPersonCategories(id, list) {
     
     let catHtml = '';
     catOrder.forEach(([cat, data], catIndex) => {
+      
       let subHtml = data.items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e => `
         <div class="sub-item">
           <span class="sub-item-name">${fmtDate(e.date)} - ${e.name||'Compra'}</span>
@@ -1221,7 +1298,7 @@ function render(){
           const idx = BANKS.indexOf(bank);
           const bc=(idx>=0 && BANK_C[idx]) ? BANK_C[idx] : '#6366f1';
           const paidInfo=tPago>0?`<span class="bank-paid-info">- ${fmt(tPago)} recebido</span>`:'';
-          return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div><div class="bank-section-total">${fmt(tLiq)}</div>${paidInfo}</div></div>${items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(renderItem).join('')}</div>`;
+          return`<div class="bank-section"><div class="bank-section-header"><div class="bank-section-name"><div class="bank-dot" style="background:${bc}"></div>${bank}<span class="bank-section-count">${items.length} compra${items.length!==1?'s':''}</span></div><div><div class="bank-section-total">${fmt(tLiq)}</div>${paidInfo}</div></div>${buildGroupedHTML(items)}</div>`;
         }).join('');
       }
     } else {
@@ -1233,7 +1310,7 @@ function render(){
       if(!filtered.length){
         hist.innerHTML=getEmptyStateHTML();
       } else {
-        hist.innerHTML=[...filtered].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||((b.id||'')>(a.id||'')?1:-1)).map(renderItem).join('');
+        hist.innerHTML=buildGroupedHTML(filtered);
       }
     }
   } catch(e) { console.error('Erro Render Principal:', e); }
