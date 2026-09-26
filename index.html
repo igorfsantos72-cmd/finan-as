@@ -188,6 +188,12 @@ header{
 .item.paid-item .item-name{text-decoration:line-through;opacity:.5}
 .item.paid-item .item-amount{opacity:.5}
 
+/* PARCEL GROUP CSS */
+.parcel-group-children { display: none; padding-left: 10px; margin-left: 14px; border-left: 2px dashed var(--border2); margin-bottom: 10px; }
+.parcel-group-children.show { display: block; }
+.badge-parcel { font-size: 9px; background: rgba(59,130,246,0.15); color: var(--blue); padding: 2px 6px; border-radius: 4px; font-weight: 600; cursor: pointer; border: 1px solid rgba(59,130,246,0.3); transition: all 0.2s; margin-left: 4px; }
+.badge-parcel:hover { background: var(--blue); color: #fff; }
+
 /* SELECTION BAR */
 .select-bar{ display:none;align-items:center;justify-content:space-between; padding:.6rem .9rem;margin-bottom:.5rem; background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25); border-radius:var(--rm);gap:.5rem; }
 .select-bar.show{display:flex}
@@ -304,7 +310,6 @@ header{
 .cap-total-card input::placeholder { color: rgba(255,255,255,0.5); }
 .cap-summary { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem 1rem; }
 .cap-footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); padding: 1rem; border-top: 1px solid var(--border); z-index: 10; }
-
 .cap-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; font-weight: 500; color: var(--text); }
 .cap-row:last-child { margin-bottom: 0; }
 .cap-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--rm); color: var(--text); padding: 8px 12px; width: 100px; text-align: right; outline: none; font-family: 'Inter', sans-serif; transition: border-color 0.2s;}
@@ -313,21 +318,6 @@ header{
 .cap-del-btn { color:var(--text3); background:none; border:none; cursor:pointer; margin-left:8px; font-size:14px; padding: 4px;}
 .cap-del-btn:hover { color:var(--red); }
 
-/* PARCEL GROUP CSS */
-.parcel-group-children {
-  display: none;
-  padding-left: 10px;
-  margin-left: 14px;
-  border-left: 2px dashed var(--border2);
-  margin-bottom: 10px;
-}
-.parcel-group-children.show { display: block; }
-.badge-parcel {
-  font-size: 9px; background: rgba(59,130,246,0.15); color: var(--blue);
-  padding: 2px 6px; border-radius: 4px; font-weight: 600; cursor: pointer;
-  border: 1px solid rgba(59,130,246,0.3); transition: all 0.2s; margin-left: 4px;
-}
-.badge-parcel:hover { background: var(--blue); color: #fff; }
 </style>
 </head>
 <body>
@@ -462,7 +452,7 @@ header{
     </div>
   </div>
 
-  <!-- 5. GRÁFICO POR PESSOA (COM DRILL-DOWN) -->
+  <!-- 5. GRÁFICO POR PESSOA -->
   <div class="card" id="card-person">
     <div class="lbl">Categoria de gastos por pessoa</div>
     <div id="person-bars">
@@ -485,6 +475,7 @@ header{
   </div>
 
 </div>
+
 
 <!-- ALERT META OVERLAY -->
 <div class="modal-overlay" id="meta-alert-overlay" style="z-index: 2000;" onclick="closeMetaAlert()"></div>
@@ -730,14 +721,14 @@ function startAudioRecognition() {
   recognition.onresult = function(event) {
     const transcript = event.results[0][0].transcript.toLowerCase();
     
-    // Extrai os números falados (ex: 50.50 ou 50,50)
+    // Extrai os números
     const numMatch = transcript.match(/\d+(?:[.,]\d+)?/);
     let amount = "";
     if (numMatch) {
         amount = numMatch[0].replace(',', '.');
     }
     
-    // Limpa a frase para tirar o valor e as palavras de ligação
+    // Limpa a frase
     let name = transcript.replace(/\d+(?:[.,]\d+)?/g, '')
                          .replace(/\breais\b/gi, '')
                          .replace(/\bcentavos\b/gi, '')
@@ -751,7 +742,6 @@ function startAudioRecognition() {
                          .trim();
     name = name.charAt(0).toUpperCase() + name.slice(1);
     
-    // Abre a tela de cadastro e preenche os campos
     openSheet();
     if(amount) document.getElementById('inp-amount').value = parseFloat(amount).toFixed(2);
     if(name) document.getElementById('inp-name').value = name;
@@ -761,7 +751,7 @@ function startAudioRecognition() {
   
   recognition.onerror = function(event) {
     if(event.error === 'not-allowed') {
-      showToast('Permissão negada! Lembre-se de rodar o site em HTTPS.', 'error');
+      showToast('Permissão de microfone negada! (Use HTTPS)', 'error');
     } else {
       showToast('Erro no áudio. Tente novamente.', 'error');
     }
@@ -1217,7 +1207,6 @@ function renderPersonCategories(id, list) {
     
     let catHtml = '';
     catOrder.forEach(([cat, data], catIndex) => {
-      
       let subHtml = data.items.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(e => `
         <div class="sub-item">
           <span class="sub-item-name">${fmtDate(e.date)} - ${e.name||'Compra'}</span>
@@ -1291,6 +1280,7 @@ function render(){
       } else {
         const byBank={};filtered.forEach(e=>{if(!e)return; if(!byBank[e.bank])byBank[e.bank]=[];byBank[e.bank].push(e);});
         const bankOrder=Object.entries(byBank).sort((a,b)=>b[1].reduce((s,e)=>s+(Number(e.amount)||0),0)-a[1].reduce((s,e)=>s+(Number(e.amount)||0),0));
+        
         hist.innerHTML=bankOrder.map(([bank,items])=>{
           const tBruto=items.reduce((s,e)=>s+(Number(e.amount)||0),0);
           const tPago=items.filter(e=>e.paid).reduce((s,e)=>s+(Number(e.amount)||0),0);
@@ -1444,6 +1434,7 @@ function gerarPDF(){
   }
 }
 
+// =============== LÓGICA DE PARCELAS ===============
 function toggleParcel(){
   const chk=document.getElementById('chk-parcel'); const fields=document.getElementById('parcel-fields'); const preview=document.getElementById('parcel-preview');
   chk.checked=!chk.checked; fields.classList.toggle('show',chk.checked);
